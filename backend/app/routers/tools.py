@@ -6,6 +6,7 @@ logged in, scans are saved to their history for the dashboard.
 """
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -103,7 +104,11 @@ async def check_email(body: EmailRequest):
 @router.post("/web-audit")
 async def audit(body: WebAuditRequest):
     try:
-        return web_audit.audit_website(body.url)
+        # audit_website does blocking network I/O (up to its 8s timeout).
+        # Run it in the threadpool: calling it inline would freeze the
+        # event loop — and an audit of THIS service would deadlock
+        # against itself until timeout.
+        return await run_in_threadpool(web_audit.audit_website, body.url)
     except ValueError as exc:
         # SSRF guard and scheme validation land here — a clean 400, never a 500.
         raise HTTPException(400, str(exc)) from None
