@@ -10,10 +10,17 @@ HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Cache-Control": "no-store",
 }
+# API responses render nothing, so they get a fully locked-down CSP.
+API_CSP = "default-src 'none'; frame-ancestors 'none'"
+# The single-service demo serves the React SPA from the same origin; it needs
+# same-origin scripts/styles and API connections — and nothing else.
+SPA_CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; "
+    "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -21,6 +28,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         for name, value in HEADERS.items():
             response.headers.setdefault(name, value)
+        is_api = request.url.path.startswith(("/api", "/health", "/docs", "/openapi"))
+        response.headers["Content-Security-Policy"] = API_CSP if is_api else SPA_CSP
         if "server" in response.headers:
             del response.headers["server"]
         return response

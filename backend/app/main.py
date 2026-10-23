@@ -4,10 +4,14 @@ Run locally:  uvicorn app.main:app --reload --port 8000
 Interactive docs: http://localhost:8000/docs
 """
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.db import init_db
@@ -59,10 +63,34 @@ def health():
     return {"status": "ok", "service": "aegis-api", "version": "1.0.0"}
 
 
-@app.get("/", tags=["ops"])
+@app.get("/api", tags=["ops"])
 def root():
     return {
         "name": settings.app_name,
         "docs": "/docs",
         "threat_coverage": THREAT_MODEL,
     }
+
+
+# --- Single-service demo mode -------------------------------------------------
+# When a built frontend is present (AEGIS_STATIC_DIR or ./static next to the
+# backend), serve the SPA from the same origin so the whole platform deploys
+# as ONE free-tier web service. API routes above always take precedence.
+_STATIC_DIR = Path(os.environ.get("AEGIS_STATIC_DIR", Path(__file__).resolve().parents[1] / "static"))
+if _STATIC_DIR.is_dir():
+    app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa_fallback(path: str):
+        candidate = _STATIC_DIR / path
+        if path and candidate.is_file():
+            return FileResponse(candidate)
+        index = _STATIC_DIR / "index.html"
+        if index.is_file():
+            return FileResponse(index)
+        raise HTTPException(404, "Not found.")
+else:
+
+    @app.get("/", tags=["ops"])
+    def api_only_root():
+        return root()

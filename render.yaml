@@ -1,0 +1,17 @@
+# Render Blueprint — one-click free-tier deployment of the full platform
+# (frontend + API as a single Docker web service).
+# Note: free services spin down when idle, so the first visit may take ~1 min.
+services:
+  - type: web
+    name: aegis-cyber-defense-platform
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: AEGIS_SECRET_KEY
+        generateValue: true
+      - key: AEGIS_ENVIRONMENT
+        value: production
+      - key: AEGIS_DATABASE_URL
+        value: sqlite:///./aegis.db
