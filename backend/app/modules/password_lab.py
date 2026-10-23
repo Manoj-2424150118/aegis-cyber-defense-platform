@@ -83,6 +83,11 @@ def assess_password(password: str) -> dict:
         issues.append("Too much repetition — avoid repeated characters and patterns.")
     entropy = _entropy_bits(password)
     score = max(0, min(100, int(entropy * 1.2) - (40 if password.lower() in COMMON_PASSWORDS else 0)))
+    # Raw charset entropy overrates repetition: "aaaaaaaaaaaa" is not a
+    # 56-bit secret in practice. Cap the score when a password is built from
+    # very few distinct characters (pattern/repetition attacks crush it).
+    if len(password) >= 6 and len(set(password)) <= max(2, len(password) // 4):
+        score = min(score, 20)
     label = "very weak" if score < 30 else "weak" if score < 50 else "fair" if score < 70 else "strong" if score < 90 else "excellent"
     return {
         "score": score, "label": label, "entropy_bits": entropy,

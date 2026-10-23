@@ -15,3 +15,5 @@ services:
         value: production
       - key: AEGIS_DATABASE_URL
         value: sqlite:///./aegis.db
+      - key: AEGIS_TRUST_PROXY
+        value: "true"

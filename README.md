@@ -129,11 +129,21 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 32 tests: engines, crypto, API, lockout, headers
+cd backend && pytest -q --cov=app     # 56 tests: engines, crypto, API, lockout, headers
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
 CI (GitHub Actions) runs on every push/PR: **ruff → bandit → pytest+cov** (backend), **npm audit → tsc → vite build** (frontend), **docker compose build**, plus **CodeQL** SAST and weekly **Dependabot** updates.
+
+### Hardening & QA (v1.1)
+Before the v1.1 deployment the platform went through a dedicated security review and an isolated-sandbox QA battery (`scripts/qa_battery.py`: functional checks, an attack suite — SSRF, SQLi, forged JWT, oversized uploads, brute force — 46 fuzz payloads, and a 100-request deterministic load loop). Findings were fixed and locked in as regression tests (`backend/tests/test_security.py`):
+
+- **SSRF**: the website-audit fetcher now resolves targets and refuses loopback/private/link-local/reserved addresses, and re-validates every redirect hop (cloud-metadata endpoints are unreachable through it)
+- **Upload DoS**: uploads are read in capped chunks — an oversized file is rejected at the limit, never buffered whole in memory
+- **Auth**: timing-equalised login errors (no user enumeration), registration rejects common/repetitive passwords, per-IP rate limits key correctly behind the hosting proxy, `/health` exempt
+- **Crash-proofing**: malformed URLs (`javascript:…`, non-numeric ports) can no longer produce a 500; a global handler returns generic errors with a request ID, never a stack trace
+- **Dependencies**: all backend and frontend packages upgraded to current versions — `pip-audit` reports **no known vulnerabilities**
+- Full results: [docs/QA_REPORT.md](docs/QA_REPORT.md)
 
 ## 🗂️ Project structure
 
@@ -148,7 +158,7 @@ CI (GitHub Actions) runs on every push/PR: **ruff → bandit → pytest+cov** (b
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 32 pytest tests
+│   ├── tests/                 # 56 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module

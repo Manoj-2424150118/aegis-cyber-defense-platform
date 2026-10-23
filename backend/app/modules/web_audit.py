@@ -9,9 +9,49 @@ frame-ancestors, X-Content-Type-Options, Referrer-Policy, cookie flags
 Only public headers are read; no intrusive probing is performed.
 """
 
+import ipaddress
+import socket
 import ssl
 import urllib.request
 from urllib.parse import urlparse
+
+
+class UnsafeUrlError(ValueError):
+    """Raised when a URL points at a non-public address (SSRF guard)."""
+
+
+def assert_public_host(hostname: str) -> None:
+    """Reject loopback / private / link-local / reserved targets.
+
+    Without this, the audit endpoint is a textbook SSRF primitive: anyone
+    could make the server fetch cloud metadata (169.254.169.254) or internal
+    admin panels. Every hostname is resolved and *every* resulting address
+    must be a public one. Redirect targets are re-checked by the opener
+    below, which closes the redirect-to-internal bypass.
+    """
+    if not hostname:
+        raise UnsafeUrlError("URL has no host.")
+    try:
+        infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise UnsafeUrlError(f"Host '{hostname}' does not resolve.") from exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise UnsafeUrlError(
+                f"Refusing to audit '{hostname}': it resolves to a non-public address ({ip})."
+            )
+
+
+class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    max_redirections = 3
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urlparse(newurl)
+        if parsed.scheme not in ("http", "https"):
+            raise UnsafeUrlError("Redirect to a non-HTTP scheme was blocked.")
+        assert_public_host(parsed.hostname or "")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 REQUIRED_HEADERS = {
     "strict-transport-security": (20, "HSTS forces browsers to use HTTPS, blocking downgrade / MITM attacks."),
@@ -75,10 +115,12 @@ def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError("Only http/https URLs can be audited.")
+    assert_public_host(parsed.hostname or "")
     req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
     ctx = ssl.create_default_context()
+    opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:  # nosec B310 - scheme allowlist enforced above
+        with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced above
             headers = dict(resp.headers.items())
             cookies = resp.headers.get_all("Set-Cookie") or []
             final_url = resp.geturl()

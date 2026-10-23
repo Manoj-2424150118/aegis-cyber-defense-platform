@@ -48,7 +48,7 @@ export function VaultPanel() {
   if (!token) {
     return (
       <section className="card">
-        <h2>🗄️ Encrypted Vault</h2>
+        <div className="card-head"><h2>🗄️ Encrypted Vault</h2><span className="tag">Module 06</span></div>
         <p className="hint">Store recovery codes, PINs and notes encrypted with AES-256-GCM. The server only ever sees ciphertext. Passwords need 12+ characters.</p>
         <form onSubmit={auth} className="stack">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required aria-label="Email" />
@@ -65,7 +65,7 @@ export function VaultPanel() {
 
   return (
     <section className="card">
-      <h2>🗄️ Encrypted Vault</h2>
+      <div className="card-head"><h2>🗄️ Encrypted Vault</h2><span className="tag">Module 06</span></div>
       <form onSubmit={add} className="stack">
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Bank recovery codes)" required aria-label="Item title" />
         <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Secret to encrypt" required aria-label="Secret" />

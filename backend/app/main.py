@@ -4,20 +4,38 @@ Run locally:  uvicorn app.main:app --reload --port 8000
 Interactive docs: http://localhost:8000/docs
 """
 
+import logging
 import os
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.db import init_db
 from app.headers import SecurityHeadersMiddleware
 from app.rate_limit import RateLimitMiddleware
 from app.routers import auth, tools, vault_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("aegis")
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Attach a request id for support/log correlation; never log bodies,
+    passwords or tokens."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = uuid.uuid4().hex[:12]
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        logger.info("%s %s -> %s [%s]", request.method, request.url.path, response.status_code, request_id)
+        return response
 
 THREAT_MODEL = [
     {"threat": "Phishing links & fake login pages", "module": "URL Analyser", "endpoint": "POST /api/tools/url"},
@@ -39,12 +57,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.0.0",
+    version="1.1.0",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
 )
+app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Last-resort handler: log the fault server-side, return a generic
+    message — stack traces and internals never reach the client."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error. Please try again."})
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -60,7 +87,7 @@ app.include_router(vault_router.router)
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.0.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.1.0"}
 
 
 @app.get("/api", tags=["ops"])

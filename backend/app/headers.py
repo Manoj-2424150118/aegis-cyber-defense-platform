@@ -10,6 +10,9 @@ HEADERS = {
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "X-Permitted-Cross-Domain-Policies": "none",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Cache-Control": "no-store",
 }

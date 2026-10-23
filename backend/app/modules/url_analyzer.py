@@ -134,8 +134,15 @@ def analyze_url(raw_url: str) -> UrlReport:
         add(30, "userinfo-trick", "Contains '@' in the address — browsers ignore everything before it, hiding the real host.")
     if "//" in parsed.path:
         add(10, "double-slash", "Double slash in the path — often used as an open-redirect / obfuscation trick.")
-    if parsed.port and parsed.port not in (80, 443):
-        add(15, "odd-port", f"Non-standard port {parsed.port} — legitimate public sites rarely need one.")
+    try:
+        port = parsed.port
+    except ValueError:
+        # e.g. "javascript:alert(1)" mangled into a host:port shape — the
+        # port property raises instead of returning None. Never 500 on input.
+        port = None
+        add(20, "malformed-port", "The URL's port is not a number — the address is malformed or disguised.")
+    if port and port not in (80, 443):
+        add(15, "odd-port", f"Non-standard port {port} — legitimate public sites rarely need one.")
 
     path_query = unquote(f"{parsed.path} {parsed.query}").lower()
     hits = [kw for kw in PHISH_KEYWORDS if kw in path_query]

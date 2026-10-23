@@ -26,6 +26,11 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 MAX_FAILURES = 5
 LOCK_MINUTES = 15
 
+# Precomputed Argon2id hash of a random throwaway password. Login attempts
+# for non-existent accounts verify against this so response timing does not
+# reveal whether an email is registered (user-enumeration via timing).
+_DUMMY_HASH = hash_password("timing-equaliser-not-a-real-password")
+
 
 def _tokens(user: User) -> TokenResponse:
     return TokenResponse(
@@ -36,6 +41,14 @@ def _tokens(user: User) -> TokenResponse:
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    from app.modules.password_lab import assess_password
+
+    assessment = assess_password(body.password)
+    if assessment["is_common_password"] or assessment["score"] < 30:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "That password is too weak or too common. Choose a longer, unique password or passphrase.",
+        )
     existing = db.query(User).filter(User.email == body.email.lower()).first()
     if existing:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Registration failed. Try logging in instead.")
@@ -51,7 +64,10 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email.lower()).first()
     if user is not None and is_locked(user):
         raise HTTPException(status.HTTP_423_LOCKED, "Account temporarily locked after repeated failed logins. Try again later.")
-    if user is None or not verify_password(body.password, user.password_hash):
+    if user is None:
+        verify_password(body.password, _DUMMY_HASH)  # equalise timing; result discarded
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password.")
+    if not verify_password(body.password, user.password_hash):
         if user is not None:
             user.failed_logins = (user.failed_logins or 0) + 1
             if user.failed_logins >= MAX_FAILURES:

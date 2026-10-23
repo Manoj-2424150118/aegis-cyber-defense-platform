@@ -1,1 +1,22 @@
-{"dependencies":{"react":"^18.3.1","react-dom":"^18.3.1"},"devDependencies":{"@types/react":"^18.3.12","@types/react-dom":"^18.3.1","@vitejs/plugin-react":"^4.3.4","typescript":"^5.7.2","vite":"^6.0.3"},"name":"aegis-frontend","private":true,"scripts":{"build":"tsc -b && vite build","dev":"vite","preview":"vite preview"},"type":"module","version":"1.0.0"}
+{
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "name": "aegis-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "type": "module",
+  "version": "1.1.0"
+}

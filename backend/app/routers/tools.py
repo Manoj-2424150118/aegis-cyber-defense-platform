@@ -12,8 +12,20 @@ from app.config import settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import ScanHistory, User
-from app.modules import email_analyzer, file_scanner, password_lab, url_analyzer, web_audit
-from app.schemas import EmailRequest, GenerateRequest, PasswordRequest, UrlRequest, WebAuditRequest
+from app.modules import (
+    email_analyzer,
+    file_scanner,
+    password_lab,
+    url_analyzer,
+    web_audit,
+)
+from app.schemas import (
+    EmailRequest,
+    GenerateRequest,
+    PasswordRequest,
+    UrlRequest,
+    WebAuditRequest,
+)
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -55,9 +67,20 @@ async def generate(body: GenerateRequest):
 
 @router.post("/file")
 async def scan_upload(file: UploadFile = File(...)):
-    data = await file.read()
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(413, f"File exceeds the {settings.max_upload_bytes // (1024 * 1024)} MB scanning limit.")
+    # Chunked, capped read: never buffer an unbounded upload in memory
+    # (a multi-GB "file" must not be able to OOM the service).
+    limit = settings.max_upload_bytes
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(413, f"File exceeds the {limit // (1024 * 1024)} MB scanning limit.")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data:
         raise HTTPException(400, "Empty file.")
     return file_scanner.scan_file(file.filename or "upload", data)
@@ -72,7 +95,11 @@ async def check_email(body: EmailRequest):
 
 @router.post("/web-audit")
 async def audit(body: WebAuditRequest):
-    return web_audit.audit_website(body.url)
+    try:
+        return web_audit.audit_website(body.url)
+    except ValueError as exc:
+        # SSRF guard and scheme validation land here — a clean 400, never a 500.
+        raise HTTPException(400, str(exc)) from None
 
 
 @router.get("/history")

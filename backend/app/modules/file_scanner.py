@@ -98,6 +98,8 @@ def scan_file(filename: str, data: bytes) -> dict:
     if zipfile.is_zipfile(io.BytesIO(data)):
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                if len(zf.infolist()) > 1000:
+                    add(15, "excessive-entries", f"Archive contains {len(zf.infolist())} entries — far beyond normal use, a known scanner-evasion pattern.")
                 total = sum(i.file_size for i in zf.infolist())
                 ratio = total / max(len(data), 1)
                 if ratio > MAX_ZIP_RATIO or total > MAX_ZIP_TOTAL:
