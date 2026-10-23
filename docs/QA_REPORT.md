@@ -1,3 +1,9 @@
+# QA & Security Test Report — Aegis v1.3
+
+**v1.3 addendum (23 Oct 2026):** clean-UI rebuild, Suggested Fix on every finding (remediation layer, fix-presence enforced by tests), and expanded detection (dangerous schemes, obfuscated IPs, executable/archive downloads, open-redirect params, BEC/gift-card language, mshta/rundll32/AMSI-bypass/credential-theft IOCs, EICAR identification, X-Powered-By/CORS/cache-control audit checks). Evidence: **70 pytest passed**; **sandbox battery 32 passed · 0 failed · 1 skipped** (canonical scores unchanged: URL 85, email 100, disguised EXE 40). Production re-verification: pending — the hosting platform reported the release deploy "Live" while the public URL initially continued serving v1.2 (no rollback/failure in the platform's event log; a follow-up deploy was triggered to force the swap).
+
+---
+
 # QA & Security Test Report — Aegis v1.2
 
 **v1.2 addendum (23 Oct 2026):** the Live Agent View release. Every analyser engine was refactored into genuine stages and is now streamed over Server-Sent Events so users watch each check execute. Evidence: **62 pytest tests passed** (incl. 6 new streaming tests asserting event order and *exact result parity* between streamed and classic endpoints — streamed findings multiset == classic findings, same scores 85/100/40); **sandbox battery 32 passed · 0 failed · 1 skipped** (33 checks, incl. 3 new stream checks: 5-step URL stream with result 85, SSRF error event on the audit stream, password stream with merged breach result); UI redesigned (v3 colour system + live console). **Production battery for v1.2: 33 passed · 0 failed · 0 skipped** (live URL, incl. all stream checks and the 100-request deterministic load loop); CI success on the release commit `051e8bd`; live stream verified in production (5 step events + result, score 85).
