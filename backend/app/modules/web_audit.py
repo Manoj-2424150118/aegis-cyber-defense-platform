@@ -95,10 +95,17 @@ def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: 
             cookie_issues.append("a cookie without HttpOnly (readable by scripts — XSS can steal it)")
         if "samesite" not in c:
             cookie_issues.append("a cookie without SameSite (CSRF risk)")
-    if cookies and not cookie_issues:
+    if not cookies:
+        # No cookies = no cookie attack surface (nothing to hijack, steal
+        # or abuse for CSRF). That is at least as safe as perfectly-flagged
+        # cookies, so the category earns full marks — with the reasoning
+        # shown, never silently.
+        score += 15
+        findings.append({"points": 15, "code": "no-cookies", "message": "No cookies are set — there is no cookie attack surface at all (nothing to hijack, steal, or abuse for CSRF), so this category earns full marks."})
+    elif not cookie_issues:
         score += 15
         findings.append({"points": 15, "code": "cookies-ok", "message": "Cookies carry Secure, HttpOnly and SameSite protections."})
-    elif cookies:
+    else:
         findings.append({"points": 0, "code": "cookie-flags", "message": "Cookie problems: " + "; ".join(sorted(set(cookie_issues))) + "."})
     if "server" in lower and any(ch.isdigit() for ch in lower["server"]):
         findings.append({"points": 0, "code": "server-version", "message": f"Server banner leaks version details ('{lower['server']}') that help attackers pick exploits."})
