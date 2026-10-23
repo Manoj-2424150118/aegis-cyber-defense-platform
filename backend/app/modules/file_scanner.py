@@ -14,6 +14,10 @@ import math
 import re
 import zipfile
 
+from app.modules.remediation import fix_for
+
+EICAR_SIGNATURE = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
+
 MAGIC = [
     (b"MZ", "Windows executable (PE)", {".exe", ".dll", ".scr", ".com"}),
     (b"\x7fELF", "Linux executable (ELF)", {".elf", ".bin", ""}),
@@ -36,6 +40,12 @@ IOC_PATTERNS = {
     "shell-dropper": re.compile(rb"(curl|wget)\s+[^\n]{0,100}\|\s*(sh|bash)", re.I),
     "base64-pe": re.compile(rb"TVqQ[A-Za-z0-9+/=]{40,}"),  # 'TVqQ' = base64 of 'MZ' header
     "crypto-wallet-address": re.compile(rb"\b(bc1|[13])[a-zA-HJ-NP-Za-km-z]{25,39}\b"),
+    "mshta-dropper": re.compile(rb"mshta\s+(https?://|javascript:|vbscript:)", re.I),
+    "rundll32-dropper": re.compile(rb"rundll32\s+[^\\n]{0,80}(javascript:|https?://|,)", re.I),
+    "amsi-bypass": re.compile(rb"(amsiinitfailed|amsi\.dll|amsibypass|virtualprotect[^\\n]{0,60}amsi)", re.I),
+    "credential-theft": re.compile(rb"(mimikatz|sekurlsa|logonpasswords|lsass)", re.I),
+    "exec-policy-bypass": re.compile(rb"-(executionpolicy|ep)\s+(bypass|unrestricted)", re.I),
+    "hidden-window": re.compile(rb"(-windowstyle\s+hidden|-w\s+hidden|wscript\.shell[^\\n]{0,40}run[^\\n]{0,20}0)", re.I),
 }
 MAX_ZIP_RATIO = 100
 MAX_ZIP_TOTAL = 500 * 1024 * 1024
@@ -63,20 +73,27 @@ class _FileContext:
                 self.detected_type, self.expected_exts = label, exts
                 break
         self.entropy = _entropy(data)
+        # The EICAR test file IS the verdict when present: it is a valid
+        # .com program by design, so generic risk checks would only add
+        # misleading noise on top of the definitive identification.
+        self.is_eicar = EICAR_SIGNATURE in data
         self.hits: dict[str, int] = {}
         self.findings: list[dict] = []
         self.score = 0
 
     def add(self, points: int, code: str, message: str) -> None:
         self.score += points
-        self.findings.append({"points": points, "code": code, "message": message})
+        self.findings.append({"points": points, "code": code, "message": message, "fix": fix_for(code)})
 
 
 def _stage_fingerprint(ctx: _FileContext) -> None:
-    pass  # hashes are computed for the report; the stage anchors the live trace
+    if EICAR_SIGNATURE in ctx.data:
+        ctx.add(0, "eicar-test", "This is the EICAR standard anti-malware TEST file — a harmless industry test string, not real malware.")
 
 
 def _stage_type(ctx: _FileContext) -> None:
+    if ctx.is_eicar:
+        return
     if ctx.expected_exts is not None and ctx.ext and ctx.ext not in ctx.expected_exts:
         ctx.add(40, "type-spoofing", f"File claims to be '{ctx.ext}' but its bytes are a {ctx.detected_type} — classic malware disguise.")
     if ctx.ext in DANGEROUS_EXT:
@@ -86,6 +103,8 @@ def _stage_type(ctx: _FileContext) -> None:
 
 
 def _stage_entropy(ctx: _FileContext) -> None:
+    if ctx.is_eicar:
+        return
     if ctx.entropy > 7.5 and len(ctx.data) > 4096:
         ctx.add(20, "high-entropy", f"Entropy {ctx.entropy:.2f}/8.00 — content looks packed or encrypted, a common malware obfuscation.")
     if ctx.detected_type.startswith("Legacy Office") or (ctx.expected_exts and ".docx" in ctx.expected_exts):
@@ -94,16 +113,20 @@ def _stage_entropy(ctx: _FileContext) -> None:
 
 
 def _stage_ioc(ctx: _FileContext) -> None:
+    if ctx.is_eicar:
+        return
     for code, pattern in IOC_PATTERNS.items():
         count = len(pattern.findall(ctx.data))
         if count:
             ctx.hits[code] = count
-    weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10}
+    weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10, "mshta-dropper": 40, "rundll32-dropper": 35, "amsi-bypass": 40, "credential-theft": 45, "exec-policy-bypass": 20, "hidden-window": 15}
     for code, count in ctx.hits.items():
         ctx.add(weights.get(code, 5), code, f"Found {count} indicator(s) of type '{code}' embedded in the file.")
 
 
 def _stage_archive(ctx: _FileContext) -> None:
+    if ctx.is_eicar:
+        return
     if not zipfile.is_zipfile(io.BytesIO(ctx.data)):
         return
     try:
@@ -153,7 +176,7 @@ def scan_file(filename: str, data: bytes) -> dict:
     verdict = "malicious" if score >= 70 else "suspicious" if score >= 40 else "low-risk" if score >= 20 else "clean"
     findings = list(ctx.findings)
     if not findings:
-        findings.append({"points": 0, "code": "clean", "message": "No static malware indicators found. This is not a guarantee — keep antivirus on."})
+        findings.append({"points": 0, "code": "clean", "message": "No static malware indicators found. This is not a guarantee — keep antivirus on.", "fix": fix_for("clean")})
     return {
         "filename": filename, "size_bytes": len(ctx.data), "detected_type": ctx.detected_type,
         # SHA-1/MD5 are reported only as threat-intel fingerprints, never for security.

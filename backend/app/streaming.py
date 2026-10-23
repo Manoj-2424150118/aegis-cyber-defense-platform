@@ -107,7 +107,8 @@ async def stream_web_audit(raw_url: str):
         report = {
             "url": raw_url, "score": 0, "grade": "F", "reachable": False,
             "findings": [{"points": 0, "code": "unreachable",
-                          "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS."}],
+                          "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS.",
+                          "fix": "Check the site is online and its TLS certificate is valid; if you block bots, allow this audit's user agent (Aegis-Security-Audit) so customers can verify you."}],
         }
         yield _sse({"type": "result", "result": report})
         return

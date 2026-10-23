@@ -33,6 +33,10 @@ Aegis gives a non-technical user one place to check each of these *before* it hu
 
 **Live Agent View (v1.2):** every analysis is streamed to the browser stage-by-stage over Server-Sent Events — you watch the agent parse, verify authentication, hunt indicators and score risk *as each check actually executes*, with the findings and running score landing live in a terminal-style console. No black box, no spinner theatre: the streamed result is byte-for-byte the classic API result (parity is enforced by tests).
 
+**Suggested fixes (v1.3):** every finding in every report ships a concrete **Suggested fix** — what to do, step by step, written for the person holding the report (end users for links/emails/files; site owners for audits, down to the exact config flag). A report should end the problem, not just name it. A test enforces that no finding can ship without one. Detection coverage also expanded: dangerous `javascript:`/`data:` schemes, numeric/hex/octal-obfuscated IPs, executable & archive downloads, open-redirect parameters, BEC wire-fraud and gift-card language, mshta/rundll32/AMSI-bypass/credential-theft indicators, the EICAR test file, and X-Powered-By / CORS-wildcard / cache-control audit checks.
+
+**License:** MIT — free for everyone, forever. Use it, fork it, modify it, self-host it. See `LICENSE` and `CONTRIBUTING.md`.
+
 ## ✨ The six protection modules
 
 | # | Threat (real-world attack) | Module | What it detects / does |
@@ -131,7 +135,7 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 62 tests: engines, crypto, API, lockout, headers, streaming parity
+cd backend && pytest -q --cov=app     # 70 tests: engines, crypto, API, lockout, headers, streaming parity, remediation
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
@@ -160,7 +164,7 @@ Before the v1.1 deployment the platform went through a dedicated security review
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 62 pytest tests
+│   ├── tests/                 # 70 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module

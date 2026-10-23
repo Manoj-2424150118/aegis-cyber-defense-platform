@@ -4,6 +4,7 @@ export interface Finding {
   points: number;
   code: string;
   message: string;
+  fix?: string;
 }
 
 export interface LiveStepEvent {

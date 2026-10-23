@@ -36,8 +36,13 @@ export function FindingsList({ findings }: { findings: Finding[] }) {
     <ul className="findings">
       {findings.map((f, i) => (
         <li key={i}>
-          <span className={f.points > 0 ? "finding-points hit" : "finding-points ok"}>{f.points > 0 ? `+${f.points}` : "✓"}</span>
-          <span>{f.message}</span>
+          <div className="finding-main">
+            <span className={f.points > 0 ? "finding-points hit" : "finding-points ok"}>{f.points > 0 ? `+${f.points}` : "✓"}</span>
+            <span>{f.message}</span>
+          </div>
+          {f.fix && (
+            <p className="fix-line"><strong>Suggested fix — </strong>{f.fix}</p>
+          )}
         </li>
       ))}
     </ul>

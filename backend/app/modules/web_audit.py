@@ -15,6 +15,8 @@ import ssl
 import urllib.request
 from urllib.parse import urlparse
 
+from app.modules.remediation import fix_for
+
 
 class UnsafeUrlError(ValueError):
     """Raised when a URL points at a non-public address (SSRF guard)."""
@@ -109,9 +111,15 @@ def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: 
         findings.append({"points": 0, "code": "cookie-flags", "message": "Cookie problems: " + "; ".join(sorted(set(cookie_issues))) + "."})
     if "server" in lower and any(ch.isdigit() for ch in lower["server"]):
         findings.append({"points": 0, "code": "server-version", "message": f"Server banner leaks version details ('{lower['server']}') that help attackers pick exploits."})
-    else:
-        score += 0  # neutral — no finding needed beyond the header set
+    if "x-powered-by" in lower:
+        findings.append({"points": 0, "code": "x-powered-by", "message": f"X-Powered-By advertises the stack ('{lower['x-powered-by']}') — free reconnaissance for attackers."})
+    if lower.get("access-control-allow-origin", "").strip() == "*":
+        findings.append({"points": 0, "code": "cors-wildcard", "message": "CORS allows ANY website to read responses (Access-Control-Allow-Origin: *) — dangerous for APIs holding user data."})
+    if https and "cache-control" not in lower:
+        findings.append({"points": 0, "code": "cache-control", "message": "No Cache-Control header — browsers and proxies may keep copies of sensitive pages. Add no-store on pages with logins, payments or personal data."})
     score = min(score, 100)
+    for f in findings:
+        f.setdefault("fix", fix_for(f["code"], audience="owner"))
     return {"url": url, "score": score, "grade": grade_for(score), "findings": findings}
 
 
@@ -143,7 +151,7 @@ def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
     except Exception as exc:
         return {
             "url": raw_url, "score": 0, "grade": "F", "reachable": False,
-            "findings": [{"points": 0, "code": "unreachable", "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS."}],
+            "findings": [{"points": 0, "code": "unreachable", "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS.", "fix": fix_for("unreachable", audience="owner")}],
         }
     result = audit_headers(final_url, headers, cookies, https=final_url.startswith("https://"))
     result["reachable"] = True

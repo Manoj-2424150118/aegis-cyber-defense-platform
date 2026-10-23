@@ -10,6 +10,7 @@ behind Business Email Compromise (BEC).
 import re
 from urllib.parse import urlparse
 
+from app.modules.remediation import fix_for
 from app.modules.url_analyzer import analyze_url
 
 URGENCY = [
@@ -43,7 +44,7 @@ class _EmailContext:
 
     def add(self, points: int, code: str, message: str) -> None:
         self.score += points
-        self.findings.append({"points": points, "code": code, "message": message})
+        self.findings.append({"points": points, "code": code, "message": message, "fix": fix_for(code)})
 
 
 def _stage_auth(ctx: _EmailContext) -> None:
@@ -86,6 +87,10 @@ def _stage_content(ctx: _EmailContext) -> None:
     bait = [b for b in CREDENTIAL_BAIT if b in text]
     if bait:
         ctx.add(30, "credential-bait", f"Message asks for secrets it must never have: {', '.join(bait)}. No legitimate service does this.")
+    if any(p in text for p in ("gift card", "gift cards", "google play card", "steam card", "itunes card", "buy bitcoin for", "crypto payment")):
+        ctx.add(20, "giftcard-scam", "Message pushes gift-card / crypto payment — the signature of executive-impersonation and tech-support scams.")
+    if any(p in text for p in ("wire transfer", "bank account has changed", "updated bank details", "change of bank account", "keep this confidential", "are you at your desk", "urgent payment")):
+        ctx.add(25, "bec-wire", "Message contains payment-diversion language (wire / bank-detail change / secrecy) — the core pattern of BEC fraud that costs companies billions.")
 
 
 def _stage_links(ctx: _EmailContext) -> None:
@@ -135,5 +140,5 @@ def analyze_email(raw_headers: str, body: str = "") -> dict:
     verdict = "malicious" if score >= 70 else "suspicious" if score >= 40 else "low-risk" if score >= 20 else "likely-safe"
     findings = list(ctx.findings)
     if not findings:
-        findings.append({"points": 0, "code": "clean", "message": "No phishing signals detected in headers or content."})
+        findings.append({"points": 0, "code": "clean", "message": "No phishing signals detected in headers or content.", "fix": fix_for("clean")})
     return {"risk_score": score, "verdict": verdict, "from_domain": ctx.from_domain, "findings": findings}

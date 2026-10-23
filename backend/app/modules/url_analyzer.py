@@ -18,7 +18,9 @@ import ipaddress
 import math
 import re
 from dataclasses import dataclass, field
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+from app.modules.remediation import fix_for
 
 SUSPICIOUS_TLDS = {"zip", "mov", "top", "xyz", "click", "loan", "men", "gq", "cf", "tk", "ml", "work", "party", "review", "science", "trade", "date", "faith", "accountant", "download", "racing", "win", "vip", "best", "live"}
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "cutt.ly", "rebrand.ly", "shorturl.at", "rb.gy", "t.ly"}
@@ -83,6 +85,10 @@ class _UrlContext:
 
     def __init__(self, raw_url: str):
         self.raw_url = raw_url
+        lowered = raw_url.strip().lower()
+        self.dangerous_scheme = next(
+            (s for s in ("javascript:", "data:", "vbscript:", "file:") if lowered.startswith(s)), None
+        )
         url = raw_url.strip()
         if "://" not in url:
             url = "http://" + url
@@ -96,10 +102,12 @@ class _UrlContext:
 
     def add(self, points: int, code: str, message: str) -> None:
         self.score += points
-        self.findings.append({"points": points, "code": code, "message": message})
+        self.findings.append({"points": points, "code": code, "message": message, "fix": fix_for(code)})
 
 
 def _stage_parse(ctx: _UrlContext) -> None:
+    if ctx.dangerous_scheme:
+        ctx.add(35, "dangerous-scheme", f"The link uses the '{ctx.dangerous_scheme}' scheme — it can execute script or render a fake page locally instead of visiting a website.")
     if not ctx.host:
         ctx.add(50, "unparseable", "The URL has no host and cannot be trusted or visited safely.")
 
@@ -125,6 +133,17 @@ def _stage_host(ctx: _UrlContext) -> None:
         ctx.add(35, "ip-host", "Host is a raw IP address — a classic phishing / malware-delivery pattern.")
     except ValueError:
         pass
+    # IPs disguised as numbers dodge blocklists: http://2130706433/ is
+    # 127.0.0.1, http://0x7f000001/ and http://0177.0.0.1/ are the same.
+    obfuscated = False
+    if host.isdigit() and 0 < int(host) <= 4294967295:
+        obfuscated = True
+    elif host.startswith("0x") and all(c in "0123456789abcdef" for c in host[2:]):
+        obfuscated = True
+    elif len(labels) == 4 and all(p.isdigit() for p in labels) and any(len(p) > 1 and p.startswith("0") for p in labels):
+        obfuscated = True
+    if obfuscated:
+        ctx.add(35, "obfuscated-ip", "Host is an IP address disguised in numeric/hex/octal form — a blocklist-evasion trick.")
     if host.startswith("xn--") or ".xn--" in host:
         ctx.add(30, "punycode", "Punycode domain — often used for homograph attacks that imitate real brands.")
     if len(labels) > 4:
@@ -172,6 +191,15 @@ def _stage_path(ctx: _UrlContext) -> None:
         ctx.add(10, "very-long", f"URL is {len(ctx.url)} characters — long URLs hide the destination and payload.")
     if re.search(r"%[0-9a-fA-F]{2}", parsed.path) and parsed.path.count("%") >= 3:
         ctx.add(10, "encoded-path", "Heavily percent-encoded path — used to smuggle payloads past filters.")
+    path_lower = parsed.path.lower()
+    if path_lower.endswith((".exe", ".msi", ".apk", ".dmg", ".scr", ".bat", ".cmd", ".jar", ".hta")):
+        ctx.add(25, "executable-download", "This link downloads a program file — message links are the #1 malware delivery route.")
+    elif path_lower.endswith((".zip", ".rar", ".7z", ".tar", ".gz", ".iso", ".img")):
+        ctx.add(10, "archive-download", "This link downloads an archive/image file — a common wrapper for hiding malware.")
+    params = parse_qs(parsed.query)
+    redirect_keys = {"url", "redirect", "redirect_url", "next", "dest", "destination", "target", "return", "returnurl", "continue"}
+    if any(k.lower() in redirect_keys and any(v.startswith(("http://", "https://", "//")) for v in vals) for k, vals in params.items()):
+        ctx.add(15, "redirect-param", "URL carries an open-redirect parameter — the first page can bounce you somewhere else entirely.")
 
 
 URL_STAGES = [
@@ -206,5 +234,5 @@ def analyze_url(raw_url: str) -> UrlReport:
     score = min(ctx.score, 100)
     findings = list(ctx.findings)
     if not findings:
-        findings.append({"points": 0, "code": "clean", "message": "No phishing or malware-delivery signals detected."})
+        findings.append({"points": 0, "code": "clean", "message": "No phishing or malware-delivery signals detected.", "fix": fix_for("clean")})
     return UrlReport(url=raw_url, risk_score=score, verdict=_verdict(score), findings=findings)

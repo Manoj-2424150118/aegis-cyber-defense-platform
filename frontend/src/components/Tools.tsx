@@ -26,7 +26,7 @@ export function UrlChecker() {
   return (
     <section className="card" id="tool-url">
       <div className="card-head"><h2>🔗 Phishing Link Checker</h2><span className="tag">Module 01</span></div>
-      <p className="hint">Paste any link from SMS, WhatsApp or email before you open it. 14 weighted signals — typosquatting, homographs, IP hosts, hidden destinations — each one explained. Watch the agent work, live.</p>
+      <p className="hint">Paste any link before you open it — the agent checks it live, signal by signal.</p>
       <form onSubmit={(e) => { e.preventDefault(); void run(url); }} className="row">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://suspicious-link.example/login" required aria-label="URL to check" />
         <button disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check link"}</button>
@@ -71,7 +71,7 @@ export function PasswordLab() {
   return (
     <section className="card" id="tool-password">
       <div className="card-head"><h2>🔑 Password Lab</h2><span className="tag">Module 02</span></div>
-      <p className="hint">Strength, crack-time and breach exposure — streamed live as each check runs. Breach checks use k-anonymity — only 5 characters of the password's hash ever leave your browser.</p>
+      <p className="hint">Strength, crack-time and breach exposure, streamed live. Only 5 characters of the password's hash ever leave your browser (k-anonymity).</p>
       <div className="row">
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type a password to test it" aria-label="Password to assess" autoComplete="off" />
         <button onClick={run} disabled={!password || scan.running}>{scan.running ? <><Spinner /> Assessing…</> : "Assess"}</button>
@@ -116,7 +116,7 @@ export function FileScanner() {
   return (
     <section className="card" id="tool-file">
       <div className="card-head"><h2>🦠 File Malware Scanner</h2><span className="tag">Module 03</span></div>
-      <p className="hint">Static triage the way a SOC analyst starts: real file type vs extension, entropy, embedded droppers, archive bombs — watch each stage run. Files are analysed in memory — never executed, never stored.</p>
+      <p className="hint">Static malware triage, stage by stage. Files are analysed in memory — never executed, never stored.</p>
       <label className="drop">
         <input type="file" onChange={onFile} aria-label="File to scan" />
         {scan.running ? <><Spinner /> Scanning…</> : "Choose a file to scan (max 10 MB)"}
@@ -151,7 +151,7 @@ export function EmailAnalyzer() {
   return (
     <section className="card" id="tool-email">
       <div className="card-head"><h2>✉️ Phishing Email Analyser</h2><span className="tag">Module 04</span></div>
-      <p className="hint">Paste the email headers (Show original / View source) and body. Aegis verifies SPF, DKIM and DMARC, hunts sender mismatches and scores the social engineering — stage by stage, live.</p>
+      <p className="hint">Paste the headers and body — authentication, spoofing and social engineering checked live.</p>
       <textarea value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder={"From: …\nAuthentication-Results: …"} rows={4} aria-label="Email headers" />
       <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Email body text or HTML…" rows={4} aria-label="Email body" />
       <div className="row">
@@ -187,7 +187,7 @@ export function WebAudit() {
   return (
     <section className="card" id="tool-web">
       <div className="card-head"><h2>🌐 Website Safety Audit</h2><span className="tag">Module 05</span></div>
-      <p className="hint">Before you type a card number anywhere: is the site itself hardened? Grades HTTPS, HSTS, CSP, clickjacking and cookie protections — live, stage by stage. SSRF-guarded — internal addresses are refused.</p>
+      <p className="hint">Grades a site's HTTPS, headers and cookies — live. Internal addresses are refused.</p>
       <form onSubmit={run} className="row">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://shop.example.com" required aria-label="Website to audit" />
         <button disabled={scan.running}>{scan.running ? <><Spinner /> Auditing…</> : "Audit site"}</button>

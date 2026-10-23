@@ -2,20 +2,15 @@ import { EmailAnalyzer, FileScanner, PasswordLab, UrlChecker, WebAudit } from ".
 import { VaultPanel } from "./components/VaultPanel";
 
 const COVERAGE = [
-  { icon: "🎣", threat: "Phishing links & fake login pages", defense: "URL Analyser — 14 weighted signals, typosquat & homograph detection", anchor: "tool-url" },
-  { icon: "🔓", threat: "Weak, reused & breached passwords", defense: "Password Lab — entropy, crack-time, k-anonymity breach check", anchor: "tool-password" },
-  { icon: "🦠", threat: "Malware & ransomware attachments", defense: "File Scanner — type-spoofing, droppers, macros, zip bombs", anchor: "tool-file" },
-  { icon: "✉️", threat: "Phishing & CEO-fraud (BEC) email", defense: "Email Analyser — SPF/DKIM/DMARC, spoofing & pressure tactics", anchor: "tool-email" },
-  { icon: "🕵️", threat: "Unsafe websites & man-in-the-middle", defense: "Website Audit — TLS, HSTS, CSP & cookie grading (SSRF-guarded)", anchor: "tool-web" },
-  { icon: "🗄️", threat: "Theft of your stored secrets", defense: "Encrypted Vault — AES-256-GCM, Argon2id key derivation", anchor: "tool-vault" },
+  { icon: "🎣", threat: "Phishing links", defense: "URL Analyser", anchor: "tool-url" },
+  { icon: "🔓", threat: "Weak & breached passwords", defense: "Password Lab", anchor: "tool-password" },
+  { icon: "🦠", threat: "Malware attachments", defense: "File Scanner", anchor: "tool-file" },
+  { icon: "✉️", threat: "Phishing & CEO-fraud email", defense: "Email Analyser", anchor: "tool-email" },
+  { icon: "🕵️", threat: "Unsafe websites", defense: "Website Audit", anchor: "tool-web" },
+  { icon: "🗄️", threat: "Stolen secrets", defense: "Encrypted Vault", anchor: "tool-vault" },
 ] as const;
 
-const CONTROLS = [
-  "Argon2id password hashing", "Account lockout + rate limiting", "SSRF protection",
-  "Upload size caps (chunked)", "Strict CSP & security headers", "JWT with short expiry",
-  "Timing-safe auth errors", "Request IDs & audit logging", "Bandit + CodeQL in CI",
-  "Dependabot", "Non-root Docker", "Generic error responses",
-] as const;
+const REPO = "https://github.com/Manoj-2424150118/aegis-cyber-defense-platform";
 
 export default function App() {
   return (
@@ -28,38 +23,30 @@ export default function App() {
         <div className="nav-links">
           <a href="#tools">Tools</a>
           <a href="#coverage">Coverage</a>
-          <a href="#security">Security</a>
-          <a href="https://github.com/Manoj-2424150118/aegis-cyber-defense-platform" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+          <a href={REPO} target="_blank" rel="noopener noreferrer">GitHub ↗</a>
           <span className="live-dot" title="Live demo">● Live</span>
         </div>
       </nav>
 
       <header className="hero" id="top">
-        <p className="hero-badge">Production-grade · Open source · Defence-in-depth</p>
-        <h1>Personal cyber defense,<br /><span className="grad">engineered like a product.</span></h1>
+        <p className="hero-badge">Free · Open source · MIT</p>
+        <h1>Check it <span className="grad">before it hurts you.</span></h1>
         <p className="sub">
-          Six security tools that protect an individual user from the attacks that actually
-          compromise people — phishing, malicious files, breached passwords and unsafe
-          websites — each verdict explained in plain language, never a black box.
+          Six tools that scan links, emails, files, passwords and websites for real threats —
+          and tell you exactly how to fix what they find.
         </p>
         <div className="hero-cta">
           <a className="btn primary" href="#tools">Run the tools</a>
-          <a className="btn ghost" href="https://github.com/Manoj-2424150118/aegis-cyber-defense-platform" target="_blank" rel="noopener noreferrer">Review the code</a>
-        </div>
-        <div className="stats">
-          <div><strong>6</strong><span>detection modules</span></div>
-          <div><strong>50+</strong><span>automated tests</span></div>
-          <div><strong>100%</strong><span>findings explained</span></div>
-          <div><strong>AES-256</strong><span>vault encryption</span></div>
+          <a className="btn ghost" href={REPO} target="_blank" rel="noopener noreferrer">View source</a>
         </div>
       </header>
 
       <section id="coverage" className="section">
-        <h2 className="section-title">Threat coverage</h2>
-        <p className="section-sub">Mapped the way a security analyst thinks: attack first, control second.</p>
-        <div className="coverage-grid">
+        <h2 className="section-title">What it covers</h2>
+        <p className="section-sub">Tap a row to jump to the tool.</p>
+        <div className="coverage-list">
           {COVERAGE.map((c) => (
-            <a key={c.threat} className="coverage-card" href={`#${c.anchor}`}>
+            <a key={c.threat} className="coverage-row" href={`#${c.anchor}`}>
               <span className="coverage-icon">{c.icon}</span>
               <strong>{c.threat}</strong>
               <span>{c.defense}</span>
@@ -70,7 +57,7 @@ export default function App() {
 
       <section id="tools" className="section">
         <h2 className="section-title">The tools</h2>
-        <p className="section-sub">No account needed for checks. Every analysis streams live — you watch the agent run each check, in order, with its findings as they land. Try the built-in samples, including a live phishing example.</p>
+        <p className="section-sub">No account needed. Every check runs live in front of you, and every finding comes with a suggested fix.</p>
         <div className="grid">
           <UrlChecker />
           <PasswordLab />
@@ -81,25 +68,21 @@ export default function App() {
         </div>
       </section>
 
-      <section id="security" className="section">
-        <h2 className="section-title">Secured like it preaches</h2>
-        <p className="section-sub">
-          Aegis audits other people's security — so its own is held to the same standard,
-          tested in an isolated sandbox before every deployment.
+      <section className="oss-band">
+        <p>
+          <strong>Open source, free forever.</strong> Aegis is MIT-licensed — read the code,
+          fork it, self-host it, or improve it. Contributions are welcome.
         </p>
-        <div className="controls">
-          {CONTROLS.map((c) => <span key={c} className="control-chip">✓ {c}</span>)}
-        </div>
+        <a className="btn ghost" href={REPO} target="_blank" rel="noopener noreferrer">Contribute on GitHub ↗</a>
       </section>
 
       <footer>
         <p>
-          Built by <a href="https://manoj-2424150118.github.io" target="_blank" rel="noopener noreferrer">Manoj Kumar Sharma</a> —
-          Cybersecurity &amp; Software Professional · FastAPI · React · TypeScript · Docker
+          Built by <a href="https://manoj-2424150118.github.io" target="_blank" rel="noopener noreferrer">Manoj Kumar Sharma</a> — Cybersecurity &amp; Software Professional
         </p>
         <p className="foot-note">
-          Aegis never executes uploaded files, never stores plaintext secrets, and breach-checks passwords
-          with k-anonymity. Static analysis is a first line of defence — keep your OS, browser and antivirus updated too.
+          Aegis never executes uploaded files and never stores plaintext secrets; breach checks use k-anonymity.
+          Heuristic scanning is a first line of defence — keep your OS, browser and antivirus updated too.
         </p>
       </footer>
     </div>
