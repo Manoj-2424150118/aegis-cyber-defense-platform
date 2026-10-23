@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.1.0",
+    version="1.2.0",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
 )
@@ -87,7 +87,7 @@ app.include_router(vault_router.router)
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.1.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.2.0"}
 
 
 @app.get("/api", tags=["ops"])

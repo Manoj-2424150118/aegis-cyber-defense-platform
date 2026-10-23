@@ -51,71 +51,115 @@ def _entropy(data: bytes) -> float:
     return -sum((c / n) * math.log2(c / n) for c in counts if c)
 
 
-def scan_file(filename: str, data: bytes) -> dict:
-    findings: list[dict] = []
-    score = 0
+class _FileContext:
+    def __init__(self, filename: str, data: bytes):
+        self.filename = filename
+        self.data = data
+        self.name = filename.lower()
+        self.ext = "." + self.name.rsplit(".", 1)[-1] if "." in self.name else ""
+        self.detected_type, self.expected_exts = "unknown", None
+        for magic, label, exts in MAGIC:
+            if data.startswith(magic):
+                self.detected_type, self.expected_exts = label, exts
+                break
+        self.entropy = _entropy(data)
+        self.hits: dict[str, int] = {}
+        self.findings: list[dict] = []
+        self.score = 0
 
-    def add(points: int, code: str, message: str) -> None:
-        nonlocal score
-        score += points
-        findings.append({"points": points, "code": code, "message": message})
+    def add(self, points: int, code: str, message: str) -> None:
+        self.score += points
+        self.findings.append({"points": points, "code": code, "message": message})
 
-    name = filename.lower()
-    ext = "." + name.rsplit(".", 1)[-1] if "." in name else ""
-    sha256 = hashlib.sha256(data).hexdigest()
-    # SHA-1/MD5 are reported only as threat-intel fingerprints, never for security.
-    sha1 = hashlib.sha1(data, usedforsecurity=False).hexdigest()
-    md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
 
-    detected_type, expected_exts = "unknown", None
-    for magic, label, exts in MAGIC:
-        if data.startswith(magic):
-            detected_type, expected_exts = label, exts
-            break
+def _stage_fingerprint(ctx: _FileContext) -> None:
+    pass  # hashes are computed for the report; the stage anchors the live trace
 
-    if expected_exts is not None and ext and ext not in expected_exts:
-        add(40, "type-spoofing", f"File claims to be '{ext}' but its bytes are a {detected_type} — classic malware disguise.")
-    if ext in DANGEROUS_EXT:
-        add(20, "dangerous-type", f"'{ext}' files can execute code. Only open them from sources you fully trust.")
-    if DOUBLE_EXT.search(name):
-        add(35, "double-extension", "Double extension (e.g. invoice.pdf.exe) — the real file type is the last extension.")
-    entropy = _entropy(data)
-    if entropy > 7.5 and len(data) > 4096:
-        add(20, "high-entropy", f"Entropy {entropy:.2f}/8.00 — content looks packed or encrypted, a common malware obfuscation.")
-    if detected_type.startswith("Legacy Office") or (expected_exts and ".docx" in expected_exts):
-        if b"vbaProject" in data or b"Macros" in data:
-            add(25, "macros-present", "Document carries macros — the #1 ransomware delivery mechanism in email attachments.")
 
-    hits: dict[str, int] = {}
+def _stage_type(ctx: _FileContext) -> None:
+    if ctx.expected_exts is not None and ctx.ext and ctx.ext not in ctx.expected_exts:
+        ctx.add(40, "type-spoofing", f"File claims to be '{ctx.ext}' but its bytes are a {ctx.detected_type} — classic malware disguise.")
+    if ctx.ext in DANGEROUS_EXT:
+        ctx.add(20, "dangerous-type", f"'{ctx.ext}' files can execute code. Only open them from sources you fully trust.")
+    if DOUBLE_EXT.search(ctx.name):
+        ctx.add(35, "double-extension", "Double extension (e.g. invoice.pdf.exe) — the real file type is the last extension.")
+
+
+def _stage_entropy(ctx: _FileContext) -> None:
+    if ctx.entropy > 7.5 and len(ctx.data) > 4096:
+        ctx.add(20, "high-entropy", f"Entropy {ctx.entropy:.2f}/8.00 — content looks packed or encrypted, a common malware obfuscation.")
+    if ctx.detected_type.startswith("Legacy Office") or (ctx.expected_exts and ".docx" in ctx.expected_exts):
+        if b"vbaProject" in ctx.data or b"Macros" in ctx.data:
+            ctx.add(25, "macros-present", "Document carries macros — the #1 ransomware delivery mechanism in email attachments.")
+
+
+def _stage_ioc(ctx: _FileContext) -> None:
     for code, pattern in IOC_PATTERNS.items():
-        count = len(pattern.findall(data))
+        count = len(pattern.findall(ctx.data))
         if count:
-            hits[code] = count
+            ctx.hits[code] = count
     weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10}
-    for code, count in hits.items():
-        add(weights.get(code, 5), code, f"Found {count} indicator(s) of type '{code}' embedded in the file.")
+    for code, count in ctx.hits.items():
+        ctx.add(weights.get(code, 5), code, f"Found {count} indicator(s) of type '{code}' embedded in the file.")
 
-    if zipfile.is_zipfile(io.BytesIO(data)):
+
+def _stage_archive(ctx: _FileContext) -> None:
+    if not zipfile.is_zipfile(io.BytesIO(ctx.data)):
+        return
+    try:
+        with zipfile.ZipFile(io.BytesIO(ctx.data)) as zf:
+            if len(zf.infolist()) > 1000:
+                ctx.add(15, "excessive-entries", f"Archive contains {len(zf.infolist())} entries — far beyond normal use, a known scanner-evasion pattern.")
+            total = sum(i.file_size for i in zf.infolist())
+            ratio = total / max(len(ctx.data), 1)
+            if ratio > MAX_ZIP_RATIO or total > MAX_ZIP_TOTAL:
+                ctx.add(35, "zip-bomb", f"Archive expands {ratio:.0f}x to {total / 1e6:.0f} MB — characteristics of a zip bomb.")
+            nested_exe = [i.filename for i in zf.infolist() if i.filename.lower().endswith(tuple(DANGEROUS_EXT))]
+            if nested_exe:
+                ctx.add(20, "archive-hides-executable", f"Archive hides executable file(s): {', '.join(nested_exe[:3])}.")
+    except zipfile.BadZipFile:
+        ctx.add(10, "corrupt-archive", "Archive structure is corrupt — sometimes used to evade scanners.")
+
+
+FILE_STAGES = [
+    ("Fingerprinting — SHA-256 · SHA-1 · MD5", _stage_fingerprint),
+    ("Type verification — magic bytes vs declared extension", _stage_type),
+    ("Entropy & macro analysis", _stage_entropy),
+    ("Indicator scan — droppers · downloaders · suspicious strings", _stage_ioc),
+    ("Archive inspection — nested payloads & zip bombs", _stage_archive),
+]
+
+
+def iter_file_stages(filename: str, data: bytes):
+    ctx = _FileContext(filename, data)
+    for label, stage in FILE_STAGES:
+        before = len(ctx.findings)
+        stage(ctx)
+        yield label, ctx.findings[before:], min(ctx.score, 100)
+    return ctx
+
+
+def scan_file(filename: str, data: bytes) -> dict:
+    """Analyse bytes WITHOUT executing them; nothing is written to disk."""
+    gen = iter_file_stages(filename, data)
+    ctx = None
+    while True:
         try:
-            with zipfile.ZipFile(io.BytesIO(data)) as zf:
-                if len(zf.infolist()) > 1000:
-                    add(15, "excessive-entries", f"Archive contains {len(zf.infolist())} entries — far beyond normal use, a known scanner-evasion pattern.")
-                total = sum(i.file_size for i in zf.infolist())
-                ratio = total / max(len(data), 1)
-                if ratio > MAX_ZIP_RATIO or total > MAX_ZIP_TOTAL:
-                    add(35, "zip-bomb", f"Archive expands {ratio:.0f}x to {total / 1e6:.0f} MB — characteristics of a zip bomb.")
-                nested_exe = [i.filename for i in zf.infolist() if i.filename.lower().endswith(tuple(DANGEROUS_EXT))]
-                if nested_exe:
-                    add(20, "archive-hides-executable", f"Archive hides executable file(s): {', '.join(nested_exe[:3])}.")
-        except zipfile.BadZipFile:
-            add(10, "corrupt-archive", "Archive structure is corrupt — sometimes used to evade scanners.")
-
-    score = min(score, 100)
+            next(gen)
+        except StopIteration as stop:
+            ctx = stop.value
+            break
+    score = min(ctx.score, 100)
     verdict = "malicious" if score >= 70 else "suspicious" if score >= 40 else "low-risk" if score >= 20 else "clean"
+    findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No static malware indicators found. This is not a guarantee — keep antivirus on."})
     return {
-        "filename": filename, "size_bytes": len(data), "detected_type": detected_type,
-        "sha256": sha256, "sha1": sha1, "md5": md5, "entropy": round(entropy, 2),
-        "risk_score": score, "verdict": verdict, "findings": findings, "ioc_hits": hits,
+        "filename": filename, "size_bytes": len(ctx.data), "detected_type": ctx.detected_type,
+        # SHA-1/MD5 are reported only as threat-intel fingerprints, never for security.
+        "sha256": hashlib.sha256(ctx.data).hexdigest(),
+        "sha1": hashlib.sha1(ctx.data, usedforsecurity=False).hexdigest(),
+        "md5": hashlib.md5(ctx.data, usedforsecurity=False).hexdigest(),
+        "entropy": round(ctx.entropy, 2),
+        "risk_score": score, "verdict": verdict, "findings": findings, "ioc_hits": ctx.hits,
     }

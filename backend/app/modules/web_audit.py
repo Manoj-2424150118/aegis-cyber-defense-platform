@@ -108,6 +108,19 @@ def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: 
     return {"url": url, "score": score, "grade": grade_for(score), "findings": findings}
 
 
+def _fetch_guarded(url: str, timeout: float = 8.0):
+    """Fetch ``url`` following only SSRF-safe redirects (guard re-checked
+    on every hop by the redirect handler). Returns (final_url, headers,
+    cookies). Caller must have validated scheme + host already."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
+    ctx = ssl.create_default_context()
+    opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
+    with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced by caller + handler
+        headers = dict(resp.headers.items())
+        cookies = resp.headers.get_all("Set-Cookie") or []
+        return resp.geturl(), headers, cookies
+
+
 def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
     url = raw_url.strip()
     if "://" not in url:
@@ -116,14 +129,8 @@ def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
     if parsed.scheme not in ("http", "https"):
         raise ValueError("Only http/https URLs can be audited.")
     assert_public_host(parsed.hostname or "")
-    req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
-    ctx = ssl.create_default_context()
-    opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
     try:
-        with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced above
-            headers = dict(resp.headers.items())
-            cookies = resp.headers.get_all("Set-Cookie") or []
-            final_url = resp.geturl()
+        final_url, headers, cookies = _fetch_guarded(url, timeout)
     except ValueError:
         raise
     except Exception as exc:

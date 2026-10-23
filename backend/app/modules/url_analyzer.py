@@ -78,44 +78,71 @@ def _verdict(score: int) -> str:
     return "safe"
 
 
-def analyze_url(raw_url: str) -> UrlReport:
-    url = raw_url.strip()
-    if "://" not in url:
-        url = "http://" + url
-    parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    findings: list[dict] = []
-    score = 0
+class _UrlContext:
+    """Mutable analysis state shared by the URL stages."""
 
-    def add(points: int, code: str, message: str) -> None:
-        nonlocal score
-        score += points
-        findings.append({"points": points, "code": code, "message": message})
+    def __init__(self, raw_url: str):
+        self.raw_url = raw_url
+        url = raw_url.strip()
+        if "://" not in url:
+            url = "http://" + url
+        self.url = url
+        self.parsed = urlparse(url)
+        self.host = (self.parsed.hostname or "").lower()
+        self.labels = self.host.split(".") if self.host else []
+        self.sld = self.labels[-2] if len(self.labels) >= 2 else ""
+        self.findings: list[dict] = []
+        self.score = 0
 
-    if not host:
-        add(50, "unparseable", "The URL has no host and cannot be trusted or visited safely.")
+    def add(self, points: int, code: str, message: str) -> None:
+        self.score += points
+        self.findings.append({"points": points, "code": code, "message": message})
 
-    if parsed.scheme != "https":
-        add(15, "no-https", "No HTTPS — traffic (and any password typed here) is not encrypted.")
 
+def _stage_parse(ctx: _UrlContext) -> None:
+    if not ctx.host:
+        ctx.add(50, "unparseable", "The URL has no host and cannot be trusted or visited safely.")
+
+
+def _stage_transport(ctx: _UrlContext) -> None:
+    if ctx.parsed.scheme != "https":
+        ctx.add(15, "no-https", "No HTTPS — traffic (and any password typed here) is not encrypted.")
+    try:
+        port = ctx.parsed.port
+    except ValueError:
+        # e.g. "javascript:alert(1)" mangled into a host:port shape — the
+        # port property raises instead of returning None. Never 500 on input.
+        port = None
+        ctx.add(20, "malformed-port", "The URL's port is not a number — the address is malformed or disguised.")
+    if port and port not in (80, 443):
+        ctx.add(15, "odd-port", f"Non-standard port {port} — legitimate public sites rarely need one.")
+
+
+def _stage_host(ctx: _UrlContext) -> None:
+    host, labels = ctx.host, ctx.labels
     try:
         ipaddress.ip_address(host)
-        add(35, "ip-host", "Host is a raw IP address — a classic phishing / malware-delivery pattern.")
+        ctx.add(35, "ip-host", "Host is a raw IP address — a classic phishing / malware-delivery pattern.")
     except ValueError:
         pass
-
     if host.startswith("xn--") or ".xn--" in host:
-        add(30, "punycode", "Punycode domain — often used for homograph attacks that imitate real brands.")
-
-    labels = host.split(".") if host else []
+        ctx.add(30, "punycode", "Punycode domain — often used for homograph attacks that imitate real brands.")
     if len(labels) > 4:
-        add(15, "many-subdomains", f"{len(labels)} domain labels — deep subdomains are used to hide the real owner.")
+        ctx.add(15, "many-subdomains", f"{len(labels)} domain labels — deep subdomains are used to hide the real owner.")
     tld = labels[-1] if labels else ""
     if tld in SUSPICIOUS_TLDS:
-        add(15, "suspicious-tld", f"The .{tld} TLD is heavily abused for phishing and malware campaigns.")
+        ctx.add(15, "suspicious-tld", f"The .{tld} TLD is heavily abused for phishing and malware campaigns.")
+    if host in SHORTENERS:
+        ctx.add(20, "shortener", "URL shortener — the real destination is hidden until clicked.")
+    if _entropy(ctx.sld) > 3.4 and len(ctx.sld) >= 8:
+        ctx.add(10, "high-entropy-host", "Hostname looks algorithmically generated (high entropy), like DGA malware domains.")
+    if "-" in ctx.sld and ctx.sld.count("-") >= 2:
+        ctx.add(5, "hyphen-stuffing", "Multiple hyphens in the domain — common in look-alike phishing domains.")
 
+
+def _stage_brand(ctx: _UrlContext) -> None:
+    host, labels, sld = ctx.host, ctx.labels, ctx.sld
     registrable = ".".join(labels[-2:]) if len(labels) >= 2 else host
-    sld = labels[-2] if len(labels) >= 2 else ""
     # Leet-speak normalisation exposes paypa1 / g00gle style imitations.
     leet = host.translate(str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"}))
     # Typosquatters hide behind hyphenated padding (paypa1-secure-login), so
@@ -123,45 +150,61 @@ def analyze_url(raw_url: str) -> UrlReport:
     candidates = {sld, *sld.split("-")} if sld else set()
     for brand, official in BRANDS.items():
         if (brand in host or brand in leet) and registrable != official and not host.endswith("." + official):
-            add(35, "brand-in-host", f"Domain imitates '{brand}' but is not the official {official}.")
+            ctx.add(35, "brand-in-host", f"Domain imitates '{brand}' but is not the official {official}.")
         elif any(c and c != brand and _levenshtein(c, brand) in (1, 2) for c in candidates) and len(brand) >= 4:
-            add(30, "typosquat", f"Domain '{sld}' is a near-miss spelling of '{brand}' (typosquatting).")
+            ctx.add(30, "typosquat", f"Domain '{sld}' is a near-miss spelling of '{brand}' (typosquatting).")
 
-    if host in SHORTENERS:
-        add(20, "shortener", "URL shortener — the real destination is hidden until clicked.")
 
+def _stage_path(ctx: _UrlContext) -> None:
+    parsed = ctx.parsed
     if "@" in parsed.netloc:
-        add(30, "userinfo-trick", "Contains '@' in the address — browsers ignore everything before it, hiding the real host.")
+        ctx.add(30, "userinfo-trick", "Contains '@' in the address — browsers ignore everything before it, hiding the real host.")
     if "//" in parsed.path:
-        add(10, "double-slash", "Double slash in the path — often used as an open-redirect / obfuscation trick.")
-    try:
-        port = parsed.port
-    except ValueError:
-        # e.g. "javascript:alert(1)" mangled into a host:port shape — the
-        # port property raises instead of returning None. Never 500 on input.
-        port = None
-        add(20, "malformed-port", "The URL's port is not a number — the address is malformed or disguised.")
-    if port and port not in (80, 443):
-        add(15, "odd-port", f"Non-standard port {port} — legitimate public sites rarely need one.")
-
+        ctx.add(10, "double-slash", "Double slash in the path — often used as an open-redirect / obfuscation trick.")
     path_query = unquote(f"{parsed.path} {parsed.query}").lower()
     hits = [kw for kw in PHISH_KEYWORDS if kw in path_query]
-    brand_in_path = [b for b in BRANDS if b in path_query and b not in host]
+    brand_in_path = [b for b in BRANDS if b in path_query and b not in ctx.host]
     if brand_in_path:
-        add(20, "brand-in-path", f"Page path name-drops {', '.join(brand_in_path)} on an unrelated domain.")
+        ctx.add(20, "brand-in-path", f"Page path name-drops {', '.join(brand_in_path)} on an unrelated domain.")
     if len(hits) >= 2:
-        add(15, "phish-keywords", f"Credential / urgency keywords in the URL: {', '.join(sorted(set(hits)))}.")
-
-    if len(url) > 100:
-        add(10, "very-long", f"URL is {len(url)} characters — long URLs hide the destination and payload.")
-    if _entropy(sld) > 3.4 and len(sld) >= 8:
-        add(10, "high-entropy-host", "Hostname looks algorithmically generated (high entropy), like DGA malware domains.")
+        ctx.add(15, "phish-keywords", f"Credential / urgency keywords in the URL: {', '.join(sorted(set(hits)))}.")
+    if len(ctx.url) > 100:
+        ctx.add(10, "very-long", f"URL is {len(ctx.url)} characters — long URLs hide the destination and payload.")
     if re.search(r"%[0-9a-fA-F]{2}", parsed.path) and parsed.path.count("%") >= 3:
-        add(10, "encoded-path", "Heavily percent-encoded path — used to smuggle payloads past filters.")
-    if "-" in sld and sld.count("-") >= 2:
-        add(5, "hyphen-stuffing", "Multiple hyphens in the domain — common in look-alike phishing domains.")
+        ctx.add(10, "encoded-path", "Heavily percent-encoded path — used to smuggle payloads past filters.")
 
-    score = min(score, 100)
+
+URL_STAGES = [
+    ("Parsing the address", _stage_parse),
+    ("Transport security — HTTPS & port", _stage_transport),
+    ("Host reputation — IP, punycode, TLD, entropy", _stage_host),
+    ("Brand impersonation & typosquatting", _stage_brand),
+    ("Path & payload heuristics", _stage_path),
+]
+
+
+def iter_url_stages(raw_url: str):
+    """Yield ``(stage_label, new_findings, running_score)`` as each stage
+    genuinely executes — this powers the live agent view in the UI."""
+    ctx = _UrlContext(raw_url)
+    for label, stage in URL_STAGES:
+        before = len(ctx.findings)
+        stage(ctx)
+        yield label, ctx.findings[before:], min(ctx.score, 100)
+    return ctx
+
+
+def analyze_url(raw_url: str) -> UrlReport:
+    gen = iter_url_stages(raw_url)
+    ctx = None
+    while True:
+        try:
+            next(gen)
+        except StopIteration as stop:
+            ctx = stop.value
+            break
+    score = min(ctx.score, 100)
+    findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No phishing or malware-delivery signals detected."})
     return UrlReport(url=raw_url, risk_score=score, verdict=_verdict(score), findings=findings)

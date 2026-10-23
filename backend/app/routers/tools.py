@@ -6,8 +6,10 @@ logged in, scans are saved to their history for the dashboard.
 """
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app import streaming
 from app.config import settings
 from app.db import get_db
 from app.deps import get_current_user
@@ -65,8 +67,7 @@ async def generate(body: GenerateRequest):
     }
 
 
-@router.post("/file")
-async def scan_upload(file: UploadFile = File(...)):
+async def _read_upload_capped(file: UploadFile) -> bytes:
     # Chunked, capped read: never buffer an unbounded upload in memory
     # (a multi-GB "file" must not be able to OOM the service).
     limit = settings.max_upload_bytes
@@ -83,6 +84,12 @@ async def scan_upload(file: UploadFile = File(...)):
     data = b"".join(chunks)
     if not data:
         raise HTTPException(400, "Empty file.")
+    return data
+
+
+@router.post("/file")
+async def scan_upload(file: UploadFile = File(...)):
+    data = await _read_upload_capped(file)
     return file_scanner.scan_file(file.filename or "upload", data)
 
 
@@ -100,6 +107,41 @@ async def audit(body: WebAuditRequest):
     except ValueError as exc:
         # SSRF guard and scheme validation land here — a clean 400, never a 500.
         raise HTTPException(400, str(exc)) from None
+
+
+# ── Live-streamed analysis (Server-Sent Events) ──────────────────────
+# Same engines, executed stage-by-stage so the UI can show the agent's
+# work as it happens. Final event payload == classic endpoint payload.
+
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+@router.post("/url/stream")
+async def check_url_stream(body: UrlRequest):
+    return StreamingResponse(streaming.stream_url(body.url), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/email/stream")
+async def check_email_stream(body: EmailRequest):
+    if not body.headers.strip() and not body.body.strip():
+        raise HTTPException(400, "Provide email headers, body, or both.")
+    return StreamingResponse(streaming.stream_email(body.headers, body.body), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/file/stream")
+async def scan_upload_stream(file: UploadFile = File(...)):
+    data = await _read_upload_capped(file)
+    return StreamingResponse(streaming.stream_file(file.filename or "upload", data), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/password/stream")
+async def password_stream(body: PasswordRequest):
+    return StreamingResponse(streaming.stream_password(body.password), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/web-audit/stream")
+async def audit_stream(body: WebAuditRequest):
+    return StreamingResponse(streaming.stream_web_audit(body.url), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.get("/history")

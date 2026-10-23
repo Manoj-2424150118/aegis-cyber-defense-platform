@@ -121,7 +121,7 @@ def attacks() -> None:
         s, _ = call("POST", "/api/tools/web-audit", {"url": target})
         record("attack", f"SSRF/scheme blocked: {target}", s == 400)
     s, _ = call("POST", "/api/auth/login", {"email": "qa@example.com", "password": "' OR '1'='1' --"})
-    record("attack", "SQL injection login attempt", s in (401, 422))
+    record("attack", "SQL injection login attempt", s in (401, 422, 429))  # 429 = per-account throttle also rejects it
     s, _ = call("GET", "/api/vault", headers={"Authorization": "Bearer aaa.bbb.ccc"})
     record("attack", "forged JWT rejected", s == 401)
     big = b"A" * (10 * 1024 * 1024 + 2048)
@@ -204,10 +204,33 @@ def load() -> None:
     record("load", "20 concurrent health checks (10 workers)", all(c == 200 for c in codes), f"(codes ok={sum(1 for c in codes if c == 200)}/20)")
 
 
+def raw_post(path: str, body: dict) -> str:
+    import subprocess as sp
+    proc = sp.run(
+        ["curl", "-s", "--max-time", "60", "-X", "POST", "-H", "Content-Type: application/json",
+         "-d", json.dumps(body), BASE + path],
+        capture_output=True, timeout=90,
+    )
+    return proc.stdout.decode("utf-8", "replace")
+
+
+def stream_checks() -> None:
+    text = raw_post("/api/tools/url/stream", {"url": "http://192.168.10.5/paypal/login/verify"})
+    steps = text.count('"type": "step"')
+    record("stream", "url stream emits 5 steps + result(85)",
+           steps == 5 and '"type": "result"' in text and '"risk_score": 85' in text, f"steps={steps}")
+    text = raw_post("/api/tools/web-audit/stream", {"url": "http://169.254.169.254/latest/meta-data/"})
+    record("stream", "web-audit stream refuses SSRF with error event", '"type": "error"' in text)
+    text = raw_post("/api/tools/password/stream", {"password": "password123"})
+    record("stream", "password stream emits steps + merged breach result",
+           text.count('"type": "step"') == 2 and '"breach"' in text)
+
+
 def main() -> int:
     print(f"Aegis QA battery against {BASE}\n" + "=" * 60)
     functional()
     attacks()
+    stream_checks()
     fuzz()
     load()
     passed = sum(1 for _, _, s in RESULTS if s == "PASS")

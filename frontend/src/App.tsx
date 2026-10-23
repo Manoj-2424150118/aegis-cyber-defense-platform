@@ -36,7 +36,7 @@ export default function App() {
 
       <header className="hero" id="top">
         <p className="hero-badge">Production-grade · Open source · Defence-in-depth</p>
-        <h1>Personal cyber defense,<br />engineered like a product.</h1>
+        <h1>Personal cyber defense,<br /><span className="grad">engineered like a product.</span></h1>
         <p className="sub">
           Six security tools that protect an individual user from the attacks that actually
           compromise people — phishing, malicious files, breached passwords and unsafe
@@ -70,7 +70,7 @@ export default function App() {
 
       <section id="tools" className="section">
         <h2 className="section-title">The tools</h2>
-        <p className="section-sub">No account needed for checks. Try the built-in samples — including a live phishing example.</p>
+        <p className="section-sub">No account needed for checks. Every analysis streams live — you watch the agent run each check, in order, with its findings as they land. Try the built-in samples, including a live phishing example.</p>
         <div className="grid">
           <UrlChecker />
           <PasswordLab />

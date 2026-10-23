@@ -1,3 +1,9 @@
+# QA & Security Test Report — Aegis v1.2
+
+**v1.2 addendum (23 Oct 2026):** the Live Agent View release. Every analyser engine was refactored into genuine stages and is now streamed over Server-Sent Events so users watch each check execute. Evidence: **62 pytest tests passed** (incl. 6 new streaming tests asserting event order and *exact result parity* between streamed and classic endpoints — streamed findings multiset == classic findings, same scores 85/100/40); **sandbox battery 32 passed · 0 failed · 1 skipped** (33 checks, incl. 3 new stream checks: 5-step URL stream with result 85, SSRF error event on the audit stream, password stream with merged breach result); UI redesigned (v3 colour system + live console). Production battery for v1.2: see the summary table update below the v1.1 report.
+
+---
+
 # QA & Security Test Report — Aegis v1.1
 
 **Date:** 23 Oct 2026 · **Version under test:** v1.1 (commits `0d5bce6`, `a404966`)

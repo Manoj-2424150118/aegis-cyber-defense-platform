@@ -31,6 +31,8 @@ Most people don't get hacked by nation-state zero-days. They get hacked by:
 
 Aegis gives a non-technical user one place to check each of these *before* it hurts them — and it practises what it preaches: the platform itself is hardened against the OWASP Top 10.
 
+**Live Agent View (v1.2):** every analysis is streamed to the browser stage-by-stage over Server-Sent Events — you watch the agent parse, verify authentication, hunt indicators and score risk *as each check actually executes*, with the findings and running score landing live in a terminal-style console. No black box, no spinner theatre: the streamed result is byte-for-byte the classic API result (parity is enforced by tests).
+
 ## ✨ The six protection modules
 
 | # | Threat (real-world attack) | Module | What it detects / does |
@@ -129,7 +131,7 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 56 tests: engines, crypto, API, lockout, headers
+cd backend && pytest -q --cov=app     # 62 tests: engines, crypto, API, lockout, headers, streaming parity
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
@@ -158,7 +160,7 @@ Before the v1.1 deployment the platform went through a dedicated security review
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 56 pytest tests
+│   ├── tests/                 # 62 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module

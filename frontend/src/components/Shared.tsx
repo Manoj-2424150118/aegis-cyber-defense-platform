@@ -1,4 +1,5 @@
-import type { Finding } from "../api";
+import { useEffect, useRef, useState } from "react";
+import type { Finding, LiveStepEvent, StreamHandlers } from "../api";
 
 export function verdictClass(score: number): string {
   if (score >= 70) return "bad";
@@ -50,6 +51,111 @@ export function ErrorNote({ error }: { error: string }) {
 
 export function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
+}
+
+/* ---------- Live agent view ---------- */
+
+export interface LiveScanState<T> {
+  steps: LiveStepEvent[];
+  total: number;
+  running: boolean;
+  elapsedMs: number;
+  run: (starter: (handlers: StreamHandlers) => Promise<T>) => Promise<T | null>;
+  reset: () => void;
+}
+
+/** Drives a streamed analysis: collects step events as the server
+ * executes each stage, tracks elapsed time for the console header. */
+export function useLiveScan<T>(): LiveScanState<T> {
+  const [steps, setSteps] = useState<LiveStepEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [running, setRunning] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startRef = useRef(0);
+
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setElapsedMs(Date.now() - startRef.current), 100);
+    return () => clearInterval(id);
+  }, [running]);
+
+  async function run(starter: (handlers: StreamHandlers) => Promise<T>): Promise<T | null> {
+    setSteps([]);
+    setTotal(0);
+    setElapsedMs(0);
+    startRef.current = Date.now();
+    setRunning(true);
+    try {
+      return await starter({
+        onStart: (t) => setTotal(t),
+        onStep: (s) => setSteps((prev) => [...prev, s]),
+      });
+    } finally {
+      setElapsedMs(Date.now() - startRef.current);
+      setRunning(false);
+    }
+  }
+
+  function reset() {
+    setSteps([]);
+    setTotal(0);
+    setElapsedMs(0);
+  }
+
+  return { steps, total, running, elapsedMs, run, reset };
+}
+
+function detailText(detail: Record<string, unknown>): string {
+  return Object.entries(detail)
+    .map(([k, v]) => `${k.replace(/_/g, " ")}: ${String(v)}`)
+    .join(" · ");
+}
+
+interface ConsoleScanView {
+  steps: LiveStepEvent[];
+  total: number;
+  running: boolean;
+  elapsedMs: number;
+}
+
+export function LiveConsole({ scan, error }: { scan: ConsoleScanView; error?: string }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
+  }, [scan.steps, scan.running]);
+  if (!scan.running && scan.steps.length === 0 && !error) return null;
+  return (
+    <div className="console" role="log" aria-live="polite" aria-label="Live analysis trace">
+      <div className="console-head">
+        <span className="cdot r" /><span className="cdot y" /><span className="cdot g" />
+        <span className="console-title">AEGIS AGENT · LIVE ANALYSIS</span>
+        <span className="console-time">{(scan.elapsedMs / 1000).toFixed(1)}s</span>
+      </div>
+      <div className="console-body" ref={bodyRef}>
+        {scan.steps.map((s) => (
+          <div className="cline" key={s.index}>
+            <div className="cline-main">
+              <span className="cstep">[{s.index}/{scan.total || "?"}]</span>
+              <span className="cmark">✓</span>
+              <span className="clabel">{s.label}</span>
+              {typeof s.running_score === "number" && <span className="cscore">risk {s.running_score}</span>}
+            </div>
+            {s.findings.map((f) => (
+              <div className="cfinding hit" key={f.code}>↳ +{f.points} — {f.message}</div>
+            ))}
+            {s.detail && <div className="cfinding info">↳ {detailText(s.detail)}</div>}
+            {s.findings.length === 0 && !s.detail && <div className="cfinding ok">↳ clear — nothing found</div>}
+          </div>
+        ))}
+        {scan.running && (
+          <div className="cline working">
+            <span className="cpulse">●</span> agent working<span className="cursor">▍</span>
+          </div>
+        )}
+        {error && <div className="cline err">✕ {error}</div>}
+      </div>
+    </div>
+  );
 }
 
 export async function copyText(text: string, setDone: (v: boolean) => void) {
