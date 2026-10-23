@@ -38,6 +38,11 @@ class SlidingWindowLimiter:
 
 general_limiter = SlidingWindowLimiter(settings.rate_limit_per_minute)
 auth_limiter = SlidingWindowLimiter(settings.auth_rate_limit_per_minute)
+# Per-account limiter, applied inside the auth routes. Per-IP limits alone
+# dilute when a platform's edge uses several proxy addresses; keying on the
+# target account cannot be diluted and directly throttles credential
+# stuffing against one person.
+account_limiter = SlidingWindowLimiter(settings.auth_rate_limit_per_minute)
 
 
 def client_ip(request: Request) -> str:

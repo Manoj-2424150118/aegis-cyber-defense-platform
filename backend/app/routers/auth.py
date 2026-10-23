@@ -61,6 +61,10 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
+    from app.rate_limit import account_limiter
+
+    if not account_limiter.allow(f"login:{body.email.lower()}"):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many login attempts for this account. Try again in a minute.")
     user = db.query(User).filter(User.email == body.email.lower()).first()
     if user is not None and is_locked(user):
         raise HTTPException(status.HTTP_423_LOCKED, "Account temporarily locked after repeated failed logins. Try again later.")

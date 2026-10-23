@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.db import Base, engine
 from app.main import app
-from app.rate_limit import auth_limiter, general_limiter
+from app.rate_limit import account_limiter, auth_limiter, general_limiter
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +19,7 @@ def _fresh_state():
     Base.metadata.create_all(bind=engine)
     general_limiter.reset()
     auth_limiter.reset()
+    account_limiter.reset()
     yield
 
 

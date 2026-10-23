@@ -4,17 +4,17 @@
 Usage:  python scripts/qa_battery.py https://aegis-cyber-defense-platform.onrender.com
         python scripts/qa_battery.py http://127.0.0.1:8020   (isolated sandbox)
 
-Stdlib only. Exit code 0 = all non-skipped checks passed. This is the same
-battery run pre-deployment (sandbox) and post-deployment (production).
+Requires: python3 + curl on PATH. Exit code 0 = all non-skipped checks
+passed. This is the same battery run pre-deployment (sandbox) and
+post-deployment (production).
 """
 
 import concurrent.futures
 import io
 import json
+import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 import uuid
 import zipfile
 
@@ -29,28 +29,40 @@ def record(section: str, name: str, ok: bool | None, note: str = "") -> None:
 
 
 def call(method: str, path: str, body=None, headers: dict | None = None, raw: bytes | None = None, timeout: float = 30):
-    url = BASE + path
+    """HTTP via curl (subprocess). Transport note: this battery originally
+    used urllib, but some sandboxed egress proxies truncate urllib's
+    chunked responses (IncompleteRead) while curl completes them — the
+    harness must measure the server, not the test network. One retry on
+    transient 502/503/504 (instance swaps on free hosting)."""
     data = raw
     hdrs = dict(headers or {})
     if body is not None:
         data = json.dumps(body).encode()
         hdrs["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # nosec B310 - test harness, operator-supplied base
-            payload = resp.read()
-            try:
-                return resp.status, json.loads(payload or b"{}")
-            except json.JSONDecodeError:
-                return resp.status, {"_text": payload[:200].decode("utf-8", "replace")}
-    except urllib.error.HTTPError as e:
-        payload = e.read()
+    last: tuple[int, dict] = (-1, {})
+    for attempt in range(2):
+        cmd = ["curl", "-s", "--max-time", str(timeout), "-X", method, "-w", "\n%{http_code}"]
+        for k, v in hdrs.items():
+            cmd += ["-H", f"{k}: {v}"]
+        if data is not None:
+            cmd += ["--data-binary", "@-"]
+        cmd.append(BASE + path)
         try:
-            return e.code, json.loads(payload or b"{}")
-        except json.JSONDecodeError:
-            return e.code, {"_text": payload[:200].decode("utf-8", "replace")}
-    except Exception as e:  # connection errors etc.
-        return -1, {"_error": f"{e.__class__.__name__}: {e}"}
+            proc = subprocess.run(cmd, input=data, capture_output=True, timeout=timeout + 10)
+            out = proc.stdout
+            payload, _, code = out.rpartition(b"\n")
+            status = int(code) if code.isdigit() else -1
+            try:
+                last = (status, json.loads(payload or b"{}"))
+            except json.JSONDecodeError:
+                last = (status, {"_text": payload[:200].decode("utf-8", "replace")})
+        except Exception as e:
+            last = (-1, {"_error": f"{e.__class__.__name__}: {e}"})
+        if last[0] in (502, 503, 504, -1) and attempt == 0:
+            time.sleep(4)
+            continue
+        return last
+    return last
 
 
 def functional() -> None:
