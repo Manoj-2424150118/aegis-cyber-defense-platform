@@ -1,0 +1,94 @@
+"""Website security audit — is a site safe to trust with your data?
+
+Fetches a site's response headers and TLS state and grades it on the
+controls that stop man-in-the-middle attacks, clickjacking, MIME-sniffing
+and XSS: HTTPS + HSTS, Content-Security-Policy, X-Frame-Options /
+frame-ancestors, X-Content-Type-Options, Referrer-Policy, cookie flags
+(Secure / HttpOnly / SameSite) and server version disclosure.
+
+Only public headers are read; no intrusive probing is performed.
+"""
+
+import ssl
+import urllib.request
+from urllib.parse import urlparse
+
+REQUIRED_HEADERS = {
+    "strict-transport-security": (20, "HSTS forces browsers to use HTTPS, blocking downgrade / MITM attacks."),
+    "content-security-policy": (20, "CSP is the strongest in-browser defence against XSS and data injection."),
+    "x-content-type-options": (10, "Prevents MIME-sniffing attacks that turn uploads into executables."),
+    "x-frame-options": (10, "Stops clickjacking by preventing the site being framed by attackers."),
+    "referrer-policy": (5, "Controls how much URL information leaks to other sites."),
+    "permissions-policy": (5, "Limits browser features (camera, mic, location) the page can abuse."),
+}
+
+
+def grade_for(score: int) -> str:
+    return "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 55 else "D" if score >= 35 else "F"
+
+
+def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: bool) -> dict:
+    """Pure scoring function — unit-tested without any network."""
+    lower = {k.lower(): v for k, v in headers.items()}
+    findings: list[dict] = []
+    score = 0
+    if https:
+        score += 15
+        findings.append({"points": 15, "code": "https", "message": "Site is served over HTTPS."})
+    else:
+        findings.append({"points": 0, "code": "no-https", "message": "Site is NOT using HTTPS — never enter passwords or card details here."})
+    for name, (points, why) in REQUIRED_HEADERS.items():
+        if name == "x-frame-options" and "frame-ancestors" in lower.get("content-security-policy", ""):
+            score += points
+            findings.append({"points": points, "code": name, "message": "Clickjacking protection provided via CSP frame-ancestors."})
+        elif name in lower:
+            score += points
+            findings.append({"points": points, "code": name, "message": f"{name} is set. {why}"})
+        else:
+            findings.append({"points": 0, "code": f"missing-{name}", "message": f"Missing {name}. {why}"})
+    cookie_issues = []
+    for cookie in cookies:
+        c = cookie.lower()
+        if "secure" not in c:
+            cookie_issues.append("a cookie without the Secure flag")
+        if "httponly" not in c:
+            cookie_issues.append("a cookie without HttpOnly (readable by scripts — XSS can steal it)")
+        if "samesite" not in c:
+            cookie_issues.append("a cookie without SameSite (CSRF risk)")
+    if cookies and not cookie_issues:
+        score += 15
+        findings.append({"points": 15, "code": "cookies-ok", "message": "Cookies carry Secure, HttpOnly and SameSite protections."})
+    elif cookies:
+        findings.append({"points": 0, "code": "cookie-flags", "message": "Cookie problems: " + "; ".join(sorted(set(cookie_issues))) + "."})
+    if "server" in lower and any(ch.isdigit() for ch in lower["server"]):
+        findings.append({"points": 0, "code": "server-version", "message": f"Server banner leaks version details ('{lower['server']}') that help attackers pick exploits."})
+    else:
+        score += 0  # neutral — no finding needed beyond the header set
+    score = min(score, 100)
+    return {"url": url, "score": score, "grade": grade_for(score), "findings": findings}
+
+
+def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
+    url = raw_url.strip()
+    if "://" not in url:
+        url = "https://" + url
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Only http/https URLs can be audited.")
+    req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
+    ctx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:  # nosec B310 - scheme allowlist enforced above
+            headers = dict(resp.headers.items())
+            cookies = resp.headers.get_all("Set-Cookie") or []
+            final_url = resp.geturl()
+    except ValueError:
+        raise
+    except Exception as exc:
+        return {
+            "url": raw_url, "score": 0, "grade": "F", "reachable": False,
+            "findings": [{"points": 0, "code": "unreachable", "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS."}],
+        }
+    result = audit_headers(final_url, headers, cookies, https=final_url.startswith("https://"))
+    result["reachable"] = True
+    return result
