@@ -83,7 +83,7 @@ export function PasswordLab() {
   return (
     <section className="card" id="tool-password">
       <div className="card-head"><h2>🔑 Password Lab</h2><span className="tag">Module 02</span></div>
-      <p className="hint">Strength, crack-time and breach exposure, streamed live. Only 5 characters of the password's hash ever leave your browser (k-anonymity).</p>
+      <p className="hint">Strength, crack-time and breach exposure, streamed live — only 5 hash characters ever leave your browser.</p>
       <div className="row">
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type a password to test it" aria-label="Password to assess" autoComplete="off" />
         <button onClick={run} disabled={!password || scan.running}>{scan.running ? <><Spinner /> Assessing…</> : "Assess"}</button>
@@ -203,7 +203,7 @@ export function MessageChecker() {
   return (
     <section className="card" id="tool-message">
       <div className="card-head"><h2>💬 Scam Message Checker</h2><span className="tag">Module 07</span></div>
-      <p className="hint">Got a suspicious SMS or WhatsApp forward? Paste it — scam playbooks, OTP fishing and every link inside it are checked live.</p>
+      <p className="hint">Paste a suspicious SMS or WhatsApp message — scam playbooks, OTP fishing and every link inside.</p>
       <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste the full message here…" rows={5} aria-label="Message to check" />
       <div className="row">
         <button onClick={() => run(text)} disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check message"}</button>
@@ -244,7 +244,7 @@ export function DomainChecker() {
   return (
     <section className="card" id="tool-domain">
       <div className="card-head"><h2>🌍 Domain Security Checker</h2><span className="tag">Module 08</span></div>
-      <p className="hint">Can anyone send email pretending to be this domain? SPF, DMARC, CAA and DNS health — graded live.</p>
+      <p className="hint">Can anyone email as this domain? SPF, DMARC, CAA and DNS health — graded live.</p>
       <form onSubmit={run} className="row">
         <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" required aria-label="Domain to check" />
         <button disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check domain"}</button>
@@ -280,7 +280,7 @@ export function TlsInspector() {
   return (
     <section className="card" id="tool-tls">
       <div className="card-head"><h2>🔒 TLS Certificate Inspector</h2><span className="tag">Module 09</span></div>
-      <p className="hint">Who vouches for a site, and for how much longer? Issuer, expiry runway, hostname coverage and protocol — from a real handshake.</p>
+      <p className="hint">Issuer, expiry, hostname coverage and protocol — graded from a real TLS handshake.</p>
       <form onSubmit={run} className="row">
         <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="https://shop.example.com" required aria-label="Host to inspect" />
         <button disabled={scan.running}>{scan.running ? <><Spinner /> Inspecting…</> : "Inspect TLS"}</button>

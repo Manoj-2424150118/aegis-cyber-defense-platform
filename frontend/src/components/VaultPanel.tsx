@@ -49,7 +49,7 @@ export function VaultPanel() {
     return (
       <section className="card">
         <div className="card-head"><h2>🗄️ Encrypted Vault</h2><span className="tag">Module 06</span></div>
-        <p className="hint">Store recovery codes, PINs and notes encrypted with AES-256-GCM. The server only ever sees ciphertext. Passwords need 12+ characters.</p>
+        <p className="hint">Recovery codes, PINs and notes, encrypted with AES-256-GCM — the server only ever sees ciphertext.</p>
         <form onSubmit={auth} className="stack">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required aria-label="Email" />
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Account password (12+ characters)" required aria-label="Password" />
