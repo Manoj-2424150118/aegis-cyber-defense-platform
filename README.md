@@ -37,7 +37,7 @@ Aegis gives a non-technical user one place to check each of these *before* it hu
 
 **License:** MIT — free for everyone, forever. Use it, fork it, modify it, self-host it. See `LICENSE` and `CONTRIBUTING.md`.
 
-## ✨ The six protection modules
+## ✨ The nine protection modules
 
 | # | Threat (real-world attack) | Module | What it detects / does |
 |---|---|---|---|
@@ -48,6 +48,9 @@ Aegis gives a non-technical user one place to check each of these *before* it hu
 | 5 | Credential stuffing after breaches | **Breach Check** | Have-I-Been-Pwned **k-anonymity** range API — only 5 hex chars of the SHA-1 hash ever leave the machine; offline fallback list when the network is down |
 | 6 | Theft of stored secrets | **Encrypted Vault** | **AES-256-GCM** authenticated encryption, key derived from the user's master password with **Argon2id**. The server stores ciphertext only — a database leak reveals nothing. Tampering and wrong passwords are detected by the GCM tag |
 | + | MITM & unsafe websites | **Website Audit** | Grades any site A–F on HTTPS/HSTS, CSP, X-Frame-Options, MIME-sniffing, Referrer/Permissions policy and cookie flags (Secure/HttpOnly/SameSite) |
+| 7 | Scam SMS / WhatsApp messages | **Scam Message Checker** | Digital-arrest & agency impersonation, KYC/account-block threats, OTP/PIN harvesting, UPI payment redirection, Telegram task scams, prize/cashback bait, crypto-doubling — and it extracts and re-scores every link in the message with Module 1 |
+| 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (incl. invalid multiple records and ~all softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
+| 9 | Expired / mismatched certificates | **TLS Certificate Inspector** | Real TLS handshake: chain verification, hostname/SAN coverage (with wildcards), expiry runway, protocol version — with an unverified re-handshake to report broken certificates instead of hiding them |
 
 ## 🏗️ Architecture
 
@@ -127,6 +130,9 @@ curl -s -X POST localhost:8000/api/tools/url \
 | POST | `/api/tools/password/breach` | – | k-anonymity breach lookup |
 | POST | `/api/tools/password/generate` | – | Secure password + passphrase |
 | POST | `/api/tools/web-audit` | – | Website security grade |
+| POST | `/api/tools/message` | – | Scam SMS/WhatsApp message analysis |
+| POST | `/api/tools/domain` | – | Domain SPF/DMARC/CAA security grade |
+| POST | `/api/tools/tls` | – | TLS certificate inspection |
 | POST | `/api/auth/register` · `/login` · `/refresh` | – | Argon2id + JWT auth with lockout |
 | GET/POST/DELETE | `/api/vault` | JWT | Encrypted vault CRUD |
 
@@ -135,7 +141,7 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 70 tests: engines, crypto, API, lockout, headers, streaming parity, remediation
+cd backend && pytest -q --cov=app     # 119 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 

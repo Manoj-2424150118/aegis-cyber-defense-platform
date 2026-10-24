@@ -183,6 +183,127 @@ export function EmailAnalyzer() {
   );
 }
 
+const SCAM_MESSAGE = "Dear customer, your bank account will be blocked today due to pending KYC. Verify immediately at http://secure-kyc-update.xyz/verify and share the OTP sent to your mobile to avoid suspension.";
+const ARREST_MESSAGE = "This is CBI cyber cell. A parcel booked in your name contained narcotics. You are under digital arrest — pay the verification amount to UPI ID officer.pay@okhdfc immediately to clear your case.";
+
+export function MessageChecker() {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.checkMessage>> | null>(null);
+  const [error, setError] = useState("");
+  type R = Awaited<ReturnType<typeof api.checkMessage>>;
+  const scan = useLiveScan<R>();
+  async function run(value: string) {
+    setError(""); setResult(null);
+    if (!value.trim()) { setError("Paste a message to check."); return; }
+    try {
+      const r = await scan.run((h) => api.checkMessageStream(value, h));
+      if (r) setResult(r);
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+  }
+  return (
+    <section className="card" id="tool-message">
+      <div className="card-head"><h2>💬 Scam Message Checker</h2><span className="tag">Module 07</span></div>
+      <p className="hint">Got a suspicious SMS or WhatsApp forward? Paste it — scam playbooks, OTP fishing and every link inside it are checked live.</p>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste the full message here…" rows={5} aria-label="Message to check" />
+      <div className="row">
+        <button onClick={() => run(text)} disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check message"}</button>
+      </div>
+      <div className="samples">
+        <button type="button" className="sample" onClick={() => { setText(SCAM_MESSAGE); void run(SCAM_MESSAGE); }}>Try a KYC scam</button>
+        <button type="button" className="sample" onClick={() => { setText(ARREST_MESSAGE); void run(ARREST_MESSAGE); }}>Try a digital-arrest scam</button>
+      </div>
+      {scan.steps.length === 0 && <ErrorNote error={error} />}
+      <LiveConsole scan={scan} error={error} />
+      {result && (
+        <div className="result">
+          <div className="result-head"><span>Message risk</span><VerdictBadge score={result.risk_score} verdict={result.verdict} /></div>
+          <ScoreMeter score={100 - result.risk_score} />
+          {result.links_found.length > 0 && <p className="meta">Links found &amp; scored: {result.links_found.join(" · ")}</p>}
+          <FindingsList findings={result.findings} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function DomainChecker() {
+  const [domain, setDomain] = useState("");
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.checkDomain>> | null>(null);
+  const [error, setError] = useState("");
+  type R = Awaited<ReturnType<typeof api.checkDomain>>;
+  const scan = useLiveScan<R>();
+  async function run(e: React.FormEvent) {
+    e.preventDefault(); setError(""); setResult(null);
+    const invalid = validateLookupTarget(domain, "audit");
+    if (invalid) { setError(invalid); return; }
+    try {
+      const r = await scan.run((h) => api.checkDomainStream(domain, h));
+      if (r) setResult(r);
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+  }
+  return (
+    <section className="card" id="tool-domain">
+      <div className="card-head"><h2>🌍 Domain Security Checker</h2><span className="tag">Module 08</span></div>
+      <p className="hint">Can anyone send email pretending to be this domain? SPF, DMARC, CAA and DNS health — graded live.</p>
+      <form onSubmit={run} className="row">
+        <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="example.com" required aria-label="Domain to check" />
+        <button disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check domain"}</button>
+      </form>
+      {scan.steps.length === 0 && <ErrorNote error={error} />}
+      <LiveConsole scan={scan} error={error} />
+      {result && (
+        <div className="result">
+          <div className="result-head"><span>Spoof-resistance grade</span><span className="grade-badge">{result.grade}</span></div>
+          <p className="meta">{result.domain} · {result.score}/100</p>
+          <FindingsList findings={result.findings} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function TlsInspector() {
+  const [host, setHost] = useState("");
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.inspectTls>> | null>(null);
+  const [error, setError] = useState("");
+  type R = Awaited<ReturnType<typeof api.inspectTls>>;
+  const scan = useLiveScan<R>();
+  async function run(e: React.FormEvent) {
+    e.preventDefault(); setError(""); setResult(null);
+    const invalid = validateLookupTarget(host, "audit");
+    if (invalid) { setError(invalid); return; }
+    try {
+      const r = await scan.run((h) => api.inspectTlsStream(host, h));
+      if (r) setResult(r);
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+  }
+  return (
+    <section className="card" id="tool-tls">
+      <div className="card-head"><h2>🔒 TLS Certificate Inspector</h2><span className="tag">Module 09</span></div>
+      <p className="hint">Who vouches for a site, and for how much longer? Issuer, expiry runway, hostname coverage and protocol — from a real handshake.</p>
+      <form onSubmit={run} className="row">
+        <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="https://shop.example.com" required aria-label="Host to inspect" />
+        <button disabled={scan.running}>{scan.running ? <><Spinner /> Inspecting…</> : "Inspect TLS"}</button>
+      </form>
+      {scan.steps.length === 0 && <ErrorNote error={error} />}
+      <LiveConsole scan={scan} error={error} />
+      {result && (
+        <div className="result">
+          <div className="result-head"><span>Certificate grade</span><span className="grade-badge">{result.grade}</span></div>
+          <p className="meta">
+            {result.host} · {result.score}/100
+            {result.facts?.issuer ? ` · Issued by ${result.facts.issuer}` : ""}
+            {typeof result.facts?.days_left === "number" ? ` · ${result.facts.days_left} days left` : ""}
+            {result.facts?.protocol ? ` · ${result.facts.protocol}` : ""}
+            {result.facts?.verified === false ? " · ⚠ chain did not verify" : ""}
+          </p>
+          <FindingsList findings={result.findings} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function WebAudit() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.webAudit>> | null>(null);

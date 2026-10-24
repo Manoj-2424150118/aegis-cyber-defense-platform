@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { EmailAnalyzer, FileScanner, PasswordLab, UrlChecker, WebAudit } from "./components/Tools";
+import { useEffect, useRef, useState } from "react";
+import { DomainChecker, EmailAnalyzer, FileScanner, MessageChecker, PasswordLab, TlsInspector, UrlChecker, WebAudit } from "./components/Tools";
 import { VaultPanel } from "./components/VaultPanel";
 import { HERO_SCAN_EVENT } from "./components/Shared";
 
@@ -8,7 +8,10 @@ const COVERAGE = [
   { icon: "🔓", threat: "Weak & breached passwords", defense: "Password Lab", anchor: "tool-password", blurb: "Strength, crack-time and breach exposure — checked with k-anonymity, never in plain text." },
   { icon: "🦠", threat: "Malware attachments", defense: "File Scanner", anchor: "tool-file", blurb: "Static triage of suspicious files in memory. Never executed, never stored." },
   { icon: "✉️", threat: "Phishing & CEO-fraud email", defense: "Email Analyser", anchor: "tool-email", blurb: "SPF/DKIM/DMARC, spoofing and social-engineering language, signal by signal." },
+  { icon: "💬", threat: "Scam SMS & WhatsApp messages", defense: "Scam Message Checker", anchor: "tool-message", blurb: "Digital-arrest, KYC, UPI and task-scam playbooks — plus every link inside the message, scored." },
   { icon: "🕵️", threat: "Unsafe websites", defense: "Website Audit", anchor: "tool-web", blurb: "Grades HTTPS, security headers and cookie flags — and shows the owner how to fix them." },
+  { icon: "🌍", threat: "Spoofable domains", defense: "Domain Security Checker", anchor: "tool-domain", blurb: "Can anyone email as this domain? SPF, DMARC, CAA and DNS health, graded from live records." },
+  { icon: "🔒", threat: "Bad TLS certificates", defense: "TLS Inspector", anchor: "tool-tls", blurb: "Issuer, expiry runway, hostname coverage and protocol version — from a real handshake." },
   { icon: "🗄️", threat: "Stolen secrets", defense: "Encrypted Vault", anchor: "tool-vault", blurb: "AES-256-GCM encryption with an Argon2id-derived key — the server stores only ciphertext, never the key." },
 ] as const;
 
@@ -17,11 +20,14 @@ const TOOL_NAV = [
   { label: "🔑 Password Lab", anchor: "tool-password" },
   { label: "🦠 File Scanner", anchor: "tool-file" },
   { label: "✉️ Email Analyser", anchor: "tool-email" },
+  { label: "💬 Message Checker", anchor: "tool-message" },
   { label: "🌐 Website Audit", anchor: "tool-web" },
+  { label: "🌍 Domain Checker", anchor: "tool-domain" },
+  { label: "🔒 TLS Inspector", anchor: "tool-tls" },
   { label: "🗄️ Vault", anchor: "tool-vault" },
 ] as const;
 
-const PROOF = ["6 live security tools", "Live agent view", "No sign-up needed", "Files never stored", "Open source · MIT"] as const;
+const PROOF = ["9 live security tools", "Live agent view", "No sign-up needed", "Files never stored", "Open source · MIT"] as const;
 
 const FAQS = [
   {
@@ -54,6 +60,36 @@ function dispatchHeroScan(url: string) {
 export default function App() {
   const [heroUrl, setHeroUrl] = useState("");
   const [version, setVersion] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+  const heroInputRef = useRef<HTMLInputElement>(null);
+
+  // "/" from anywhere jumps to the hero scan box — the keyboard
+  // shortcut every power-user tool (GitHub, CyberChef) trains you on.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? "").toUpperCase();
+      if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        heroInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const TOOLS = [
+    { id: "tool-url", name: "Phishing Link Checker", kw: "url link phishing website address", node: <UrlChecker /> },
+    { id: "tool-password", name: "Password Lab", kw: "password strength breach generator passphrase", node: <PasswordLab /> },
+    { id: "tool-file", name: "File Malware Scanner", kw: "file malware virus attachment scan upload", node: <FileScanner /> },
+    { id: "tool-email", name: "Phishing Email Analyser", kw: "email phishing bec headers spf dkim dmarc", node: <EmailAnalyzer /> },
+    { id: "tool-message", name: "Scam Message Checker", kw: "sms whatsapp message scam text telegram upi kyc digital arrest", node: <MessageChecker /> },
+    { id: "tool-web", name: "Website Safety Audit", kw: "website audit headers https cookies security grade", node: <WebAudit /> },
+    { id: "tool-domain", name: "Domain Security Checker", kw: "domain dns spf dmarc caa email spoofing mx", node: <DomainChecker /> },
+    { id: "tool-tls", name: "TLS Certificate Inspector", kw: "tls ssl certificate https expiry issuer handshake", node: <TlsInspector /> },
+    { id: "tool-vault", name: "Encrypted Vault", kw: "vault secrets password manager encryption storage", node: <VaultPanel /> },
+  ];
+  const visibleTools = TOOLS.filter((t) => `${t.name} ${t.kw}`.toLowerCase().includes(filter.trim().toLowerCase()));
 
   // Live platform status — real data from /health, shown in the nav.
   useEffect(() => {
@@ -111,17 +147,19 @@ export default function App() {
         <p className="hero-badge">Free · Open source · MIT</p>
         <h1>Check it <span className="grad">before it hurts you.</span></h1>
         <p className="sub">
-          One place for every check that matters: links, emails, files, passwords and websites —
-          analysed live by an agent that shows its work and tells you exactly how to fix what it finds.
+          One place for every check that matters: links, emails, messages, files, passwords,
+          websites, domains and certificates — analysed live by an agent that shows its work
+          and tells you exactly how to fix what it finds.
         </p>
         <form
           className="hero-scan"
           onSubmit={(e) => { e.preventDefault(); if (heroUrl.trim()) dispatchHeroScan(heroUrl.trim()); }}
         >
           <input
+            ref={heroInputRef}
             value={heroUrl}
             onChange={(e) => setHeroUrl(e.target.value)}
-            placeholder="Paste a suspicious link — https://…"
+            placeholder="Paste a suspicious link — https://…  ( press / )"
             aria-label="Link to check"
           />
           <button type="submit">Check it now</button>
@@ -138,7 +176,7 @@ export default function App() {
 
       <section id="coverage" className="section reveal">
         <h2 className="section-title">What it covers</h2>
-        <p className="section-sub">Six tools, one platform — pick a threat and jump straight to its tool.</p>
+        <p className="section-sub">Nine tools, one platform — pick a threat and jump straight to its tool.</p>
         <div className="coverage-grid">
           {COVERAGE.map((c) => (
             <a key={c.threat} className="coverage-card" href={`#${c.anchor}`}>
@@ -158,13 +196,20 @@ export default function App() {
         <div className="tool-nav" aria-label="Jump to a tool">
           {TOOL_NAV.map((t) => <a key={t.anchor} href={`#${t.anchor}`}>{t.label}</a>)}
         </div>
+        <div className="tool-filter">
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter tools — try 'password', 'dns', 'scam'…"
+            aria-label="Filter tools"
+          />
+          {filter.trim() && <span className="filter-count">{visibleTools.length} of {TOOLS.length} tools</span>}
+        </div>
         <div className="grid">
-          <UrlChecker />
-          <PasswordLab />
-          <FileScanner />
-          <EmailAnalyzer />
-          <WebAudit />
-          <div id="tool-vault"><VaultPanel /></div>
+          {visibleTools.map((t) => (
+            <div key={t.id} className="tool-cell" id={t.id === "tool-vault" ? "tool-vault" : undefined}>{t.node}</div>
+          ))}
+          {visibleTools.length === 0 && <p className="meta">No tool matches “{filter}”. Try a shorter word — or clear the filter to see all nine.</p>}
         </div>
       </section>
 

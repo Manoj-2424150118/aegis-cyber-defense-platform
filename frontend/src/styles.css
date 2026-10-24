@@ -135,6 +135,11 @@ section[id], .card[id], #tool-vault { scroll-margin-top: 128px; }
 }
 .tool-nav a:hover { color: var(--text); border-color: rgba(0, 240, 255, 0.4); transform: translateY(-1px); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; align-items: start; }
+.tool-cell { min-width: 0; display: flex; }
+.tool-cell > .card { flex: 1; }
+.tool-filter { display: flex; align-items: center; gap: 0.8rem; margin: 0.2rem 0 1rem; }
+.tool-filter input { max-width: 420px; }
+.filter-count { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-cyan); white-space: nowrap; }
 .card {
   background: var(--glass); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 1.4rem;

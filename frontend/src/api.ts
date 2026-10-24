@@ -223,6 +223,16 @@ export const api = {
     post<{ risk_score: number; verdict: string; findings: Finding[] }>("/api/tools/email", { headers, body }),
   webAudit: (url: string) =>
     post<{ score: number; grade: string; reachable: boolean; findings: Finding[] }>("/api/tools/web-audit", { url }),
+  checkMessage: (text: string) =>
+    post<{ risk_score: number; verdict: string; findings: Finding[]; links_found: string[] }>("/api/tools/message", { text }),
+  checkDomain: (domain: string) =>
+    post<{ domain: string; score: number; grade: string; findings: Finding[] }>("/api/tools/domain", { domain }),
+  inspectTls: (host: string) =>
+    post<{
+      host: string; score: number; grade: string; reachable?: boolean;
+      facts: { issuer?: string; subject?: string; san?: string[]; not_after?: string; days_left?: number | null; protocol?: string | null; verified?: boolean };
+      findings: Finding[];
+    }>("/api/tools/tls", { host }),
   async scanFile(file: File) {
     const form = new FormData();
     form.append("file", file);
@@ -249,6 +259,16 @@ export const api = {
     }>("/api/tools/password/stream", { password }, h),
   webAuditStream: (url: string, h?: StreamHandlers) =>
     streamPost<{ score: number; grade: string; reachable: boolean; findings: Finding[] }>("/api/tools/web-audit/stream", { url }, h),
+  checkMessageStream: (text: string, h?: StreamHandlers) =>
+    streamPost<{ risk_score: number; verdict: string; findings: Finding[]; links_found: string[] }>("/api/tools/message/stream", { text }, h),
+  checkDomainStream: (domain: string, h?: StreamHandlers) =>
+    streamPost<{ domain: string; score: number; grade: string; findings: Finding[] }>("/api/tools/domain/stream", { domain }, h),
+  inspectTlsStream: (host: string, h?: StreamHandlers) =>
+    streamPost<{
+      host: string; score: number; grade: string; reachable?: boolean;
+      facts: { issuer?: string; subject?: string; san?: string[]; not_after?: string; days_left?: number | null; protocol?: string | null; verified?: boolean };
+      findings: Finding[];
+    }>("/api/tools/tls/stream", { host }, h),
   scanFileStream: (file: File, h?: StreamHandlers) => {
     const form = new FormData();
     form.append("file", file);
