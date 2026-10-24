@@ -141,7 +141,18 @@ section[id], .card[id], #tool-vault { scroll-margin-top: 128px; }
 .tool-cell { min-width: 0; display: flex; }
 .tool-cell > .card { flex: 1; width: 100%; display: flex; flex-direction: column; }
 .tool-cell > .card .result { margin-top: auto; }
-.card .hint { min-height: 2.6em; }
+/* Internal rhythm: every card reserves the same title zone (2 lines)
+   and description zone (3 lines), so headings, descriptions and
+   controls start at identical heights across a row — and each card's
+   main control block anchors to the bottom edge instead of leaving
+   dead space under it. Text areas and the file drop-zone grow to
+   fill their card. */
+.card-head { min-height: 2.6em; align-items: flex-start; }
+.card .hint { min-height: 4.4em; }
+.tool-cell > .card > form,
+.tool-cell > .card > .row { margin-top: auto; }
+.tool-cell > .card > textarea,
+.tool-cell > .card > .drop { flex: 1 1 auto; }
 .tool-filter { display: flex; align-items: center; gap: 0.8rem; margin: 0.2rem 0 1rem; }
 .tool-filter input { max-width: 420px; }
 .filter-count { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-cyan); white-space: nowrap; }
