@@ -14,6 +14,6 @@ services:
       - key: AEGIS_ENVIRONMENT
         value: production
       - key: AEGIS_DATABASE_URL
-        value: sqlite:///./aegis.db
+        sync: false # set in the dashboard only — a hosted Postgres URL (Neon) so accounts survive redeploys; unset falls back to local SQLite
       - key: AEGIS_TRUST_PROXY
         value: "true"

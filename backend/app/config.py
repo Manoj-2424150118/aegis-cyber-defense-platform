@@ -5,6 +5,7 @@ project runs locally out-of-the-box for demos and tests; production
 deployments MUST override ``AEGIS_SECRET_KEY`` (see ``.env.example``).
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,19 @@ class Settings(BaseSettings):
     trust_proxy: bool = False  # set True only behind a proxy that sets X-Forwarded-For
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MiB
     hibp_api_url: str = "https://api.pwnedpasswords.com/range/"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, v: object) -> object:
+        # Hosted Postgres providers (Neon, Supabase, …) hand out
+        # "postgresql://" URLs, which SQLAlchemy maps to the legacy
+        # psycopg2 dialect. Pin the installed psycopg (v3) driver
+        # explicitly so a pasted provider URL works as-is.
+        if isinstance(v, str):
+            for prefix in ("postgresql://", "postgres://"):
+                if v.startswith(prefix):
+                    return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
 
 settings = Settings()
