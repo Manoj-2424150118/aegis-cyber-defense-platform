@@ -30,6 +30,7 @@ export function VaultPanel() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault(); setError("");
+    if (master.length < 12) { setError("Master password needs at least 12 characters."); return; }
     try {
       await api.vaultCreate(token, title, secret, master);
       setTitle(""); setSecret("");
@@ -69,7 +70,7 @@ export function VaultPanel() {
       <form onSubmit={add} className="stack">
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Bank recovery codes)" required aria-label="Item title" />
         <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Secret to encrypt" required aria-label="Secret" />
-        <input type="password" value={master} onChange={(e) => setMaster(e.target.value)} placeholder="Master password (encrypts/decrypts items)" required aria-label="Master password" />
+        <input type="password" value={master} onChange={(e) => setMaster(e.target.value)} placeholder="Master password (12+ characters — encrypts/decrypts items)" required aria-label="Master password" />
         <button>Add encrypted item</button>
       </form>
       <ErrorNote error={error} />

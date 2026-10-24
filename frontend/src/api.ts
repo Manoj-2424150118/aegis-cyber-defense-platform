@@ -109,6 +109,32 @@ async function fetchWithTimeout(url: string, init: RequestInit, opts: FetchOptio
   throw friendlyError(lastError);
 }
 
+/** FastAPI error bodies come in three shapes: our own endpoints raise
+ * {detail: "message"}, but request-validation failures (422) return
+ * {detail: [{loc, msg, …}]} and a few paths return an object. Passing
+ * any of those straight into `new Error(...)` renders the infamous
+ * "[object Object]" — so normalise every shape to readable text here,
+ * once, for every caller. */
+export function detailToMessage(detail: unknown, status: number): string {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        const e = d as { loc?: unknown; msg?: string };
+        const field = Array.isArray(e.loc) ? e.loc.filter((p) => p !== "body").join(".") : "";
+        return e.msg ? (field ? `${field}: ${e.msg}` : e.msg) : "";
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" · ");
+  }
+  if (detail && typeof detail === "object") {
+    const o = detail as { msg?: string; message?: string };
+    if (o.msg) return o.msg;
+    if (o.message) return o.message;
+  }
+  return `Request failed (${status})`;
+}
+
 export interface Finding {
   points: number;
   code: string;
@@ -147,8 +173,8 @@ export async function streamPost<T>(path: string, body: unknown, handlers: Strea
     { timeoutMs: STREAM_CONNECT_TIMEOUT_MS, retryColdStart: true },
   );
   if (!res.ok || !res.body) {
-    const data = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(data.detail ?? `Request failed (${res.status})`);
+    const data = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    throw new Error(detailToMessage(data.detail, res.status));
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -198,8 +224,8 @@ async function post<T>(path: string, body: unknown, token?: string, retryColdSta
     { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart },
   );
   if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(data.detail ?? `Request failed (${res.status})`);
+    const data = (await res.json().catch(() => ({}))) as { detail?: unknown };
+    throw new Error(detailToMessage(data.detail, res.status));
   }
   return (await res.json()) as T;
 }
