@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ErrorNote } from "./Shared";
 
+/* The demo runs on free hosting with temporary storage: every
+ * redeploy resets the account database, while the browser keeps its
+ * login token — so a returning user can hold a token for an account
+ * that no longer exists. Detect those 401s and end the session
+ * gracefully with an explanation instead of a cryptic API error. */
+const SESSION_ERRORS = ["Account no longer exists.", "Invalid or expired token.", "Authentication required.", "Invalid refresh token."];
+const SESSION_NOTICE =
+  "Your session ended — the free demo's storage resets whenever the app is redeployed, so demo accounts and vault items don't persist. Please create the account again, and never store real secrets in the demo.";
+
+function isSessionError(err: unknown): boolean {
+  return err instanceof Error && SESSION_ERRORS.some((s) => err.message.includes(s));
+}
+
 export function VaultPanel() {
   const [token, setToken] = useState<string>(() => localStorage.getItem("aegis_token") ?? "");
   const [email, setEmail] = useState("");
@@ -14,8 +27,17 @@ export function VaultPanel() {
   const [opened, setOpened] = useState("");
   const [error, setError] = useState("");
 
+  function endSession() {
+    localStorage.removeItem("aegis_token");
+    setToken("");
+    setItems([]);
+    setOpened("");
+    setError(SESSION_NOTICE);
+  }
+
   async function load(t: string) {
-    try { setItems(await api.vaultList(t)); } catch { setItems([]); }
+    try { setItems(await api.vaultList(t)); }
+    catch (err) { if (isSessionError(err)) endSession(); else setItems([]); }
   }
   useEffect(() => { if (token) void load(token); }, [token]);
 
@@ -35,7 +57,7 @@ export function VaultPanel() {
       await api.vaultCreate(token, title, secret, master);
       setTitle(""); setSecret("");
       await load(token);
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not save item"); }
+    } catch (err) { if (isSessionError(err)) endSession(); else setError(err instanceof Error ? err.message : "Could not save item"); }
   }
 
   async function open(id: number) {
@@ -43,7 +65,7 @@ export function VaultPanel() {
     try {
       const r = await api.vaultOpen(token, id, master);
       setOpened(r.secret);
-    } catch (err) { setError(err instanceof Error ? err.message : "Could not open item"); }
+    } catch (err) { if (isSessionError(err)) endSession(); else setError(err instanceof Error ? err.message : "Could not open item"); }
   }
 
   if (!token) {
@@ -74,6 +96,7 @@ export function VaultPanel() {
         <button>Add encrypted item</button>
       </form>
       <ErrorNote error={error} />
+      <p className="meta">Demo note: storage resets on redeploys — don't keep real secrets here.</p>
       <ul className="vault-list">
         {items.map((i) => (
           <li key={i.id}><span>{i.title}</span><button className="secondary" onClick={() => open(i.id)}>Open</button></li>

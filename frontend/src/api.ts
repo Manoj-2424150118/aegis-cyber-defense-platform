@@ -315,7 +315,10 @@ export const api = {
       { headers: { Authorization: `Bearer ${token}` } },
       { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart: true },
     );
-    if (!res.ok) throw new Error("Could not load vault");
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { detail?: unknown };
+      throw new Error(detailToMessage(data.detail, res.status));
+    }
     return (await res.json()) as { id: number; title: string }[];
   },
   vaultOpen: (token: string, id: number, master_password: string) =>
