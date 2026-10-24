@@ -17,6 +17,15 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
+from app.config import settings
+from app.db import init_db
+from app.headers import SecurityHeadersMiddleware
+from app.rate_limit import RateLimitMiddleware
+from app.routers import auth, tools, vault_router
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("aegis")
+
 
 class SelectiveGZipMiddleware(GZipMiddleware):
     """Gzip for ordinary responses (smaller payloads = the origin
@@ -29,15 +38,6 @@ class SelectiveGZipMiddleware(GZipMiddleware):
             await self.app(scope, receive, send)
             return
         await super().__call__(scope, receive, send)
-
-from app.config import settings
-from app.db import init_db
-from app.headers import SecurityHeadersMiddleware
-from app.rate_limit import RateLimitMiddleware
-from app.routers import auth, tools, vault_router
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-logger = logging.getLogger("aegis")
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
