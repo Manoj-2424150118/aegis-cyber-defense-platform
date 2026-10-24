@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { Finding, LiveStepEvent, StreamHandlers } from "../api";
 
+/** The hero scan box dispatches this event; the URL checker listens
+ * for it, adopts the value and runs — one search surface, like the
+ * big single-purpose tool sites (paste once, land on the result). */
+export const HERO_SCAN_EVENT = "aegis:hero-scan";
+
 export function verdictClass(score: number): string {
   if (score >= 70) return "bad";
   if (score >= 40) return "warn";

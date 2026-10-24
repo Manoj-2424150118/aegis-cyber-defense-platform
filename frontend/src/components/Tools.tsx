@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, validateLookupTarget } from "../api";
-import { copyText, ErrorNote, FindingsList, LiveConsole, ScoreMeter, Spinner, StrengthMeter, useLiveScan, VerdictBadge } from "./Shared";
+import { copyText, ErrorNote, FindingsList, HERO_SCAN_EVENT, LiveConsole, ScoreMeter, Spinner, StrengthMeter, useLiveScan, VerdictBadge } from "./Shared";
 
 const PHISH_URL = "http://192.168.10.5/paypa1-secure-login.xyz/verify?account=suspended";
 const SAFE_URL = "https://www.google.com";
@@ -16,6 +16,16 @@ export function UrlChecker() {
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.checkUrl>> | null>(null);
   type R = Awaited<ReturnType<typeof api.checkUrl>>;
   const scan = useLiveScan<R>();
+  // The hero scan box hands its value over through this event.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const value = (e as CustomEvent<string>).detail;
+      if (value) { setUrl(value); void run(value); }
+    };
+    window.addEventListener(HERO_SCAN_EVENT, handler);
+    return () => window.removeEventListener(HERO_SCAN_EVENT, handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   async function run(value: string) {
     setError(""); setResult(null);
     const invalid = validateLookupTarget(value, "score");

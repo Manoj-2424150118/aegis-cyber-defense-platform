@@ -1,18 +1,92 @@
+import { useEffect, useState } from "react";
 import { EmailAnalyzer, FileScanner, PasswordLab, UrlChecker, WebAudit } from "./components/Tools";
 import { VaultPanel } from "./components/VaultPanel";
+import { HERO_SCAN_EVENT } from "./components/Shared";
 
 const COVERAGE = [
-  { icon: "🎣", threat: "Phishing links", defense: "URL Analyser", anchor: "tool-url" },
-  { icon: "🔓", threat: "Weak & breached passwords", defense: "Password Lab", anchor: "tool-password" },
-  { icon: "🦠", threat: "Malware attachments", defense: "File Scanner", anchor: "tool-file" },
-  { icon: "✉️", threat: "Phishing & CEO-fraud email", defense: "Email Analyser", anchor: "tool-email" },
-  { icon: "🕵️", threat: "Unsafe websites", defense: "Website Audit", anchor: "tool-web" },
-  { icon: "🗄️", threat: "Stolen secrets", defense: "Encrypted Vault", anchor: "tool-vault" },
+  { icon: "🎣", threat: "Phishing links", defense: "URL Analyser", anchor: "tool-url", blurb: "Scores any link for typosquats, IP hosts, shorteners and credential-harvest signals." },
+  { icon: "🔓", threat: "Weak & breached passwords", defense: "Password Lab", anchor: "tool-password", blurb: "Strength, crack-time and breach exposure — checked with k-anonymity, never in plain text." },
+  { icon: "🦠", threat: "Malware attachments", defense: "File Scanner", anchor: "tool-file", blurb: "Static triage of suspicious files in memory. Never executed, never stored." },
+  { icon: "✉️", threat: "Phishing & CEO-fraud email", defense: "Email Analyser", anchor: "tool-email", blurb: "SPF/DKIM/DMARC, spoofing and social-engineering language, signal by signal." },
+  { icon: "🕵️", threat: "Unsafe websites", defense: "Website Audit", anchor: "tool-web", blurb: "Grades HTTPS, security headers and cookie flags — and shows the owner how to fix them." },
+  { icon: "🗄️", threat: "Stolen secrets", defense: "Encrypted Vault", anchor: "tool-vault", blurb: "AES-256-GCM encryption with an Argon2id-derived key — the server stores only ciphertext, never the key." },
+] as const;
+
+const TOOL_NAV = [
+  { label: "🔗 Link Checker", anchor: "tool-url" },
+  { label: "🔑 Password Lab", anchor: "tool-password" },
+  { label: "🦠 File Scanner", anchor: "tool-file" },
+  { label: "✉️ Email Analyser", anchor: "tool-email" },
+  { label: "🌐 Website Audit", anchor: "tool-web" },
+  { label: "🗄️ Vault", anchor: "tool-vault" },
+] as const;
+
+const PROOF = ["6 live security tools", "Live agent view", "No sign-up needed", "Files never stored", "Open source · MIT"] as const;
+
+const FAQS = [
+  {
+    q: "Is Aegis really free?",
+    a: "Yes — free and open source under the MIT licence. No account is needed for any check; an account only unlocks the encrypted vault and scan history.",
+  },
+  {
+    q: "What happens to files I scan?",
+    a: "They are analysed in memory on the server and discarded when the scan finishes. Files are never executed and never written to disk or stored.",
+  },
+  {
+    q: "How does the breach check work without sending my password?",
+    a: "It uses k-anonymity: only the first 5 characters of your password's SHA-1 hash leave the browser, and the match is completed locally against the returned suffixes — the same model Have I Been Pwned uses.",
+  },
+  {
+    q: "Can I trust the verdicts?",
+    a: "Every verdict is explainable: each finding lists the exact signal, its weight, and a suggested fix. Aegis is a heuristic first line of defence — treat a clean result as 'no known signals found', not a guarantee, and keep your OS, browser and antivirus updated.",
+  },
 ] as const;
 
 const REPO = "https://github.com/Manoj-2424150118/aegis-cyber-defense-platform";
+const PHISH_SAMPLE = "http://192.168.10.5/paypal/login/verify";
+const SAFE_SAMPLE = "https://www.google.com";
+
+function dispatchHeroScan(url: string) {
+  window.dispatchEvent(new CustomEvent(HERO_SCAN_EVENT, { detail: url }));
+  document.getElementById("tool-url")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 export default function App() {
+  const [heroUrl, setHeroUrl] = useState("");
+  const [version, setVersion] = useState<string | null>(null);
+
+  // Live platform status — real data from /health, shown in the nav.
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10_000);
+    fetch("/health", { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { version?: string } | null) => setVersion(d?.version ?? null))
+      .catch(() => setVersion(null))
+      .finally(() => clearTimeout(timer));
+    return () => ctrl.abort();
+  }, []);
+
+  // Scroll-reveal: sections rise in as they enter the viewport.
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll(".reveal"));
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((e) => e.classList.add("visible"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((en) => {
+        if (en.isIntersecting) {
+          en.target.classList.add("visible");
+          io.unobserve(en.target);
+        }
+      }),
+      { threshold: 0.1 },
+    );
+    els.forEach((e) => io.observe(e));
+    return () => io.disconnect();
+  }, []);
+
   return (
     <div className="page">
       <nav className="nav">
@@ -23,8 +97,13 @@ export default function App() {
         <div className="nav-links">
           <a href="#tools">Tools</a>
           <a href="#coverage">Coverage</a>
+          <a href="#how">How it works</a>
+          <a href="#faq">FAQ</a>
           <a href={REPO} target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-          <span className="live-dot" title="Live demo">● Live</span>
+          <span className="live-pill" title="Live platform status">
+            <span className={version ? "live-dot" : "live-dot off"}>●</span>
+            {version ? ` Live · v${version}` : " Live demo"}
+          </span>
         </div>
       </nav>
 
@@ -32,24 +111,42 @@ export default function App() {
         <p className="hero-badge">Free · Open source · MIT</p>
         <h1>Check it <span className="grad">before it hurts you.</span></h1>
         <p className="sub">
-          Six tools that scan links, emails, files, passwords and websites for real threats —
-          and tell you exactly how to fix what they find.
+          One place for every check that matters: links, emails, files, passwords and websites —
+          analysed live by an agent that shows its work and tells you exactly how to fix what it finds.
         </p>
-        <div className="hero-cta">
-          <a className="btn primary" href="#tools">Run the tools</a>
-          <a className="btn ghost" href={REPO} target="_blank" rel="noopener noreferrer">View source</a>
+        <form
+          className="hero-scan"
+          onSubmit={(e) => { e.preventDefault(); if (heroUrl.trim()) dispatchHeroScan(heroUrl.trim()); }}
+        >
+          <input
+            value={heroUrl}
+            onChange={(e) => setHeroUrl(e.target.value)}
+            placeholder="Paste a suspicious link — https://…"
+            aria-label="Link to check"
+          />
+          <button type="submit">Check it now</button>
+        </form>
+        <div className="hero-samples">
+          <span>Try:</span>
+          <button type="button" className="sample" onClick={() => { setHeroUrl(PHISH_SAMPLE); dispatchHeroScan(PHISH_SAMPLE); }}>a phishing link</button>
+          <button type="button" className="sample" onClick={() => { setHeroUrl(SAFE_SAMPLE); dispatchHeroScan(SAFE_SAMPLE); }}>a safe link</button>
+        </div>
+        <div className="proof-strip" aria-label="Platform facts">
+          {PROOF.map((p) => <span key={p} className="proof-chip">{p}</span>)}
         </div>
       </header>
 
-      <section id="coverage" className="section">
+      <section id="coverage" className="section reveal">
         <h2 className="section-title">What it covers</h2>
-        <p className="section-sub">Tap a row to jump to the tool.</p>
-        <div className="coverage-list">
+        <p className="section-sub">Six tools, one platform — pick a threat and jump straight to its tool.</p>
+        <div className="coverage-grid">
           {COVERAGE.map((c) => (
-            <a key={c.threat} className="coverage-row" href={`#${c.anchor}`}>
+            <a key={c.threat} className="coverage-card" href={`#${c.anchor}`}>
               <span className="coverage-icon">{c.icon}</span>
               <strong>{c.threat}</strong>
-              <span>{c.defense}</span>
+              <span className="coverage-defense">{c.defense}</span>
+              <span className="coverage-blurb">{c.blurb}</span>
+              <span className="coverage-arrow">Open tool →</span>
             </a>
           ))}
         </div>
@@ -58,6 +155,9 @@ export default function App() {
       <section id="tools" className="section">
         <h2 className="section-title">The tools</h2>
         <p className="section-sub">No account needed. Every check runs live in front of you, and every finding comes with a suggested fix.</p>
+        <div className="tool-nav" aria-label="Jump to a tool">
+          {TOOL_NAV.map((t) => <a key={t.anchor} href={`#${t.anchor}`}>{t.label}</a>)}
+        </div>
         <div className="grid">
           <UrlChecker />
           <PasswordLab />
@@ -68,7 +168,42 @@ export default function App() {
         </div>
       </section>
 
-      <section className="oss-band">
+      <section id="how" className="section reveal">
+        <h2 className="section-title">How it works</h2>
+        <p className="section-sub">The same flow for every tool — no black boxes.</p>
+        <div className="steps">
+          <div className="step-card">
+            <span className="step-num">01</span>
+            <strong>Paste, drop or type</strong>
+            <p>A link, an email, a file, a password, a website — whatever reached you and made you pause.</p>
+          </div>
+          <div className="step-card">
+            <span className="step-num">02</span>
+            <strong>The agent analyses live</strong>
+            <p>Each engine runs its stages in the open, streaming every signal it checks into the live console.</p>
+          </div>
+          <div className="step-card">
+            <span className="step-num">03</span>
+            <strong>Get a score + the fix</strong>
+            <p>A plain-language verdict, the evidence behind it, and a suggested fix for every single finding.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" className="section reveal">
+        <h2 className="section-title">Questions</h2>
+        <p className="section-sub">The things people ask before they trust a security tool.</p>
+        <div className="faq-list">
+          {FAQS.map((f) => (
+            <details key={f.q} className="faq-item">
+              <summary>{f.q}</summary>
+              <p>{f.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="oss-band reveal">
         <p>
           <strong>Open source, free forever.</strong> Aegis is MIT-licensed — read the code,
           fork it, self-host it, or improve it. Contributions are welcome.
