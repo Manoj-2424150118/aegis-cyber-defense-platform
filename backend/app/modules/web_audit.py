@@ -134,7 +134,16 @@ def _fetch_guarded(url: str, timeout: float = 8.0):
     """Fetch ``url`` following only SSRF-safe redirects (guard re-checked
     on every hop by the redirect handler). Returns (final_url, headers,
     cookies). Caller must have validated scheme + host already."""
-    req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
+    # Browser-compatible UA with the scanner identified in the
+    # comment field (the Googlebot convention): some sites serve a
+    # stripped bot-variant page with most security headers missing,
+    # and the audit should grade what a real visitor's browser
+    # receives — while still honestly naming the scanner.
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; Aegis-Security-Audit/1.6; +https://aegis-cyber-defense-platform.onrender.com)"},
+        method="GET",
+    )
     ctx = ssl.create_default_context()
     opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
     with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced by caller + handler
