@@ -62,6 +62,7 @@ export function VaultPanel() {
 
   async function open(id: number) {
     setError("");
+    setOpened(""); // never leave a stale decrypted secret on screen beside a new error
     try {
       const r = await api.vaultOpen(token, id, master);
       setOpened(r.secret);
