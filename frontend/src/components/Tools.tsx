@@ -87,7 +87,9 @@ export function PasswordLab() {
       <div className="row">
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Type a password to test it" aria-label="Password to assess" autoComplete="off" />
         <button onClick={run} disabled={!password || scan.running}>{scan.running ? <><Spinner /> Assessing…</> : "Assess"}</button>
-        <button className="secondary" onClick={async () => setGenerated(await api.generate())}>Generate strong one</button>
+      </div>
+      <div className="samples">
+        <button type="button" className="sample" onClick={async () => setGenerated(await api.generate())}>Generate a strong one</button>
       </div>
       {scan.steps.length === 0 && <ErrorNote error={error} />}
       <LiveConsole scan={scan} error={error} />
@@ -209,8 +211,8 @@ export function MessageChecker() {
         <button onClick={() => run(text)} disabled={scan.running}>{scan.running ? <><Spinner /> Checking…</> : "Check message"}</button>
       </div>
       <div className="samples">
-        <button type="button" className="sample" onClick={() => { setText(SCAM_MESSAGE); void run(SCAM_MESSAGE); }}>Try a KYC scam</button>
-        <button type="button" className="sample" onClick={() => { setText(ARREST_MESSAGE); void run(ARREST_MESSAGE); }}>Try a digital-arrest scam</button>
+        <button type="button" className="sample" onClick={() => { setText(SCAM_MESSAGE); void run(SCAM_MESSAGE); }}>Try: KYC scam</button>
+        <button type="button" className="sample" onClick={() => { setText(ARREST_MESSAGE); void run(ARREST_MESSAGE); }}>Try: digital arrest</button>
       </div>
       {scan.steps.length === 0 && <ErrorNote error={error} />}
       <LiveConsole scan={scan} error={error} />
