@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../api";
+import { api, validateLookupTarget } from "../api";
 import { copyText, ErrorNote, FindingsList, LiveConsole, ScoreMeter, Spinner, StrengthMeter, useLiveScan, VerdictBadge } from "./Shared";
 
 const PHISH_URL = "http://192.168.10.5/paypa1-secure-login.xyz/verify?account=suspended";
@@ -18,6 +18,8 @@ export function UrlChecker() {
   const scan = useLiveScan<R>();
   async function run(value: string) {
     setError(""); setResult(null);
+    const invalid = validateLookupTarget(value, "score");
+    if (invalid) { setError(invalid); return; }
     try {
       const r = await scan.run((h) => api.checkUrlStream(value, h));
       if (r) setResult(r);
@@ -179,6 +181,8 @@ export function WebAudit() {
   const scan = useLiveScan<R>();
   async function run(e: React.FormEvent) {
     e.preventDefault(); setError(""); setResult(null);
+    const invalid = validateLookupTarget(url, "audit");
+    if (invalid) { setError(invalid); return; }
     try {
       const r = await scan.run((h) => api.webAuditStream(url, h));
       if (r) setResult(r);
