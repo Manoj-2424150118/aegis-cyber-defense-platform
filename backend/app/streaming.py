@@ -13,9 +13,14 @@ from __future__ import annotations
 import asyncio
 import json
 
-from app.modules import web_audit
+from app.modules import domain_checker, tls_inspector, web_audit
 from app.modules.email_analyzer import analyze_email, iter_email_stages
 from app.modules.file_scanner import iter_file_stages, scan_file
+from app.modules.message_analyzer import (
+    MESSAGE_STAGES,
+    analyze_message,
+    iter_message_stages,
+)
 from app.modules.password_lab import assess_password, breach_check
 from app.modules.url_analyzer import analyze_url, iter_url_stages
 
@@ -51,6 +56,62 @@ async def stream_email(headers: str, body: str):
     async for chunk in _emit_stages(iter_email_stages(headers, body), len(EMAIL_STAGES), "email"):
         yield chunk
     yield _sse({"type": "result", "result": analyze_email(headers, body)})
+
+
+async def stream_message(text: str):
+    async for chunk in _emit_stages(iter_message_stages(text), len(MESSAGE_STAGES), "message"):
+        yield chunk
+    yield _sse({"type": "result", "result": analyze_message(text)})
+
+
+async def stream_domain(domain: str):
+    """DNS lookups happen once (in an executor — they block), then the
+    genuine evaluation stages are emitted one by one, like the other
+    engines. Stage findings are slices of the same evaluation the
+    classic endpoint returns."""
+    yield _sse({"type": "start", "tool": "domain", "total_steps": len(domain_checker.DOMAIN_STAGES)})
+    loop = asyncio.get_running_loop()
+    records = await loop.run_in_executor(None, domain_checker.fetch_records, domain)
+    gen = domain_checker.iter_domain_stages(domain, records)
+    index = 0
+    ctx = None
+    while True:
+        try:
+            label, new_findings, running = next(gen)
+        except StopIteration as stop:
+            ctx = stop.value
+            break
+        index += 1
+        yield _sse({"type": "step", "index": index, "label": label, "status": "done",
+                    "findings": new_findings, "running_score": running})
+        await asyncio.sleep(PACING_SECONDS)
+    score = min(ctx.score, 100)
+    yield _sse({"type": "result", "result": {"domain": domain, "score": score,
+                                             "grade": domain_checker.grade_for(score),
+                                             "findings": ctx.findings}})
+
+
+async def stream_tls(host: str):
+    yield _sse({"type": "start", "tool": "tls", "total_steps": 3})
+    loop = asyncio.get_running_loop()
+    try:
+        await loop.run_in_executor(None, tls_inspector.assert_public_host, host)
+    except ValueError as exc:
+        yield _sse({"type": "error", "message": str(exc)})
+        return
+    yield _sse({"type": "step", "index": 1, "label": "Resolving host & SSRF safety check", "status": "done", "findings": []})
+    await asyncio.sleep(PACING_SECONDS)
+    report = await loop.run_in_executor(None, tls_inspector.inspect_tls, host)
+    if not report.get("reachable", True):
+        yield _sse({"type": "result", "result": report})
+        return
+    yield _sse({"type": "step", "index": 2, "label": "TLS handshake & certificate capture", "status": "done",
+                "findings": [], "detail": {"protocol": report["facts"].get("protocol"),
+                                           "issuer": report["facts"].get("issuer")}})
+    await asyncio.sleep(PACING_SECONDS)
+    yield _sse({"type": "step", "index": 3, "label": "Grading chain, hostname & expiry", "status": "done",
+                "findings": report["findings"], "running_score": report["score"]})
+    yield _sse({"type": "result", "result": report})
 
 
 async def stream_file(filename: str, data: bytes):

@@ -99,6 +99,39 @@ FIXES: dict[str, str] = {
     "cors-wildcard": "FIX: `Access-Control-Allow-Origin: *` lets any website read your API responses. Reflect only trusted origins instead, and never combine `*` with credentialed requests.",
     "cache-control": "FIX: Add `Cache-Control: no-store` on pages that handle logins, payments or personal data so browsers don't keep sensitive copies.",
     "unreachable": "Check the site is online and its TLS certificate is valid; if you block bots, allow this audit's user agent (Aegis-Security-Audit) so customers can verify you.",
+    # ── Scam-message analyser ───────────────────────────────────────
+    "link-present": "Don't tap it inside the message. Open the service's official app or type its address yourself — if the claim in the message is real, it will be visible there.",
+    "kyc-threat": "Do not follow any link or number in the message. Banks update KYC only inside their official app/branch. Open your banking app directly and check your account status there; report the message in your SMS/messaging app.",
+    "digital-arrest": "Hang up / stop replying immediately. No Indian agency conducts arrests, video interrogations or 'verification payments' over calls or messages. Do not transfer any money; report the number at cybercrime.gov.in or call the national cyber helpline 1930.",
+    "prize-scam": "Delete the message. Real winnings never arrive by random SMS/WhatsApp and never require a fee, tax or recharge to release. If a brand is named, check its official app — nothing will be waiting.",
+    "task-scam": "Stop and do not pay any 'registration', 'unlock' or 'withdrawal' fee — that fee is the scam, and each payment invents a bigger one. Leave the group/chat and report it; money already sent should be reported at cybercrime.gov.in / 1930 immediately.",
+    "crypto-doubling": "Do not send any money or crypto. Guaranteed-profit schemes pay early 'profits' from later victims' deposits and collapse. If you already invested, stop adding funds and report at cybercrime.gov.in.",
+    "upi-payment-ask": "Never pay a personal UPI ID for fees, KYC, refunds or 'verification' — refunds and charges never work that way. Pay only inside the official app of the organisation, and verify the payee name shown by your UPI app before any transfer.",
+    # ── Domain checker (for domain owners) ──────────────────────────
+    "dns-live": "Keep it: monitor DNS uptime and keep at least two nameservers on separate networks.",
+    "dns-dead": "FIX: Point the domain's A/AAAA records at your host (or accept that the domain is parked). If the domain should not exist publicly, keep it registered and monitored — an expired domain can be re-registered by attackers.",
+    "mx-present": "Keep it: ensure every MX host itself passes this platform's Website Audit and has valid TLS.",
+    "mx-missing": "FIX: If the domain sends mail, add MX records for your mail provider. If it never sends mail, publish a null MX (RFC 7505: `0 .`) plus deny-all SPF/DMARC below so forged mail is trivially detectable.",
+    "spf-strong": "Keep it: re-check this score after every new sending service is added — a stale SPF that omits a real sender will hard-fail legitimate mail.",
+    "spf-soft": "FIX: Once every legitimate sender is in the SPF record, change the ending from ~all (or ?all) to -all so receivers reject forgeries instead of merely flagging them.",
+    "spf-multiple": "FIX: Merge all SPF values into ONE TXT record starting with v=spf1 (multiple records invalidate SPF), keeping total DNS lookups under 10.",
+    "dmarc-strong": "Keep it: also publish DMARC for every subdomain (sp=reject) and review aggregate reports monthly for new sending services.",
+    "dmarc-quarantine": "FIX: When DMARC aggregate reports show all legitimate mail passing, raise the policy from p=quarantine to p=reject for full spoofing protection.",
+    "dmarc-monitor": "FIX: Monitor-only DMARC blocks nothing. Review the aggregate reports for 2–4 weeks, fix any legitimate sender that fails, then move to p=quarantine and finally p=reject.",
+    "caa-present": "Keep it: add a CAA iodef record too, so attempted mis-issuance is reported to you.",
+    "caa-missing": "FIX: Publish a CAA record naming only your certificate authority, e.g. `example.com. CAA 0 issue \"letsencrypt.org\"` (plus `0 iodef \"mailto:security@example.com\"`), so no other CA may issue for your domain.",
+    # ── TLS inspector (for site owners) ─────────────────────────────
+    "tls-verified": "Keep it: automate renewal (Let's Encrypt / ACME) so the chain never lapses, and monitor expiry with this inspector.",
+    "tls-unverified": "FIX: Replace the certificate with one from a public CA (Let's Encrypt is free), serve the FULL chain (leaf + intermediates), and remove any expired/self-signed certificate from the TLS endpoint.",
+    "tls-hostname-match": "Keep it: when adding subdomains, extend the certificate's SAN list rather than deploying mismatched certificates.",
+    "tls-hostname-mismatch": "FIX: Issue a certificate that actually covers this hostname (add it to the SAN list) — a mismatched certificate triggers browser warnings and destroys trust.",
+    "tls-expired": "FIX: Renew the certificate TODAY and automate renewal (ACME clients renew 30 days before expiry). An expired certificate shows every visitor a full-page warning.",
+    "tls-expiring-soon": "FIX: Renew now and automate it — ACME/Let's Encrypt renewal takes minutes and prevents an expiry outage.",
+    "tls-expiry-ok": "Keep it: calendar a renewal check at 30 days remaining, or automate with ACME so it never becomes urgent.",
+    "tls-modern-protocol": "Keep it: disable anything below TLS 1.2 at the server so old clients negotiate up or fail closed.",
+    "tls-weak-protocol": "FIX: Disable TLS 1.0/1.1 and SSLv3 at the server (nginx: `ssl_protocols TLSv1.2 TLSv1.3;`) — legacy protocols have known attacks (POODLE, BEAST).",
+    "tls-san-present": "Keep it: SANs are the standard — ensure every hostname the site answers on is listed.",
+    "tls-no-san": "FIX: Re-issue the certificate with subject-alt-names for every hostname — modern browsers ignore CN-only certificates.",
 }
 
 _PREFIX_FIXES = (
@@ -111,6 +144,10 @@ _PREFIX_FIXES = (
 # instructs the *site owner*. The audit passes audience="owner".
 _OWNER_OVERRIDES: dict[str, str] = {
     "no-https": "FIX: Obtain a free TLS certificate (Let's Encrypt / your host's panel), serve the site over HTTPS, redirect all HTTP to HTTPS, then enable HSTS once stable.",
+    # The email analyser uses these codes with end-user advice; the
+    # domain checker needs the owner-side remediation instead.
+    "spf-missing": "FIX: Publish one TXT record listing every service allowed to send for this domain, e.g. `v=spf1 include:_spf.google.com -all` — adapt the includes to your actual mail providers.",
+    "dmarc-missing": "FIX: Publish a DMARC record at _dmarc.yourdomain (start with `v=DMARC1; p=none; rua=mailto:dmarc@yourdomain` to collect reports, then progress to p=reject). Without DMARC your domain can be spoofed by anyone.",
 }
 
 

@@ -16,19 +16,26 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models import ScanHistory, User
 from app.modules import (
+    domain_checker,
     email_analyzer,
     file_scanner,
+    message_analyzer,
     password_lab,
+    tls_inspector,
     url_analyzer,
     web_audit,
 )
 from app.schemas import (
+    DomainRequest,
     EmailRequest,
     GenerateRequest,
+    MessageRequest,
     PasswordRequest,
+    TlsRequest,
     UrlRequest,
     WebAuditRequest,
 )
+from app.validation import host_from_url, is_valid_domain, is_valid_host
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -114,6 +121,40 @@ async def audit(body: WebAuditRequest):
         raise HTTPException(400, str(exc)) from None
 
 
+@router.post("/message")
+async def check_message(body: MessageRequest):
+    if not body.text.strip():
+        raise HTTPException(400, "Paste a message to check.")
+    return message_analyzer.analyze_message(body.text)
+
+
+def _checked_domain(raw: str) -> str:
+    host = host_from_url(raw)
+    if not is_valid_domain(host):
+        raise HTTPException(400, f"'{host or raw}' is not a valid domain name.")
+    return host
+
+
+@router.post("/domain")
+async def check_domain(body: DomainRequest):
+    domain = _checked_domain(body.domain)
+    # DNS lookups block; keep them off the event loop.
+    return await run_in_threadpool(domain_checker.check_domain, domain)
+
+
+@router.post("/tls")
+async def check_tls(body: TlsRequest):
+    host = host_from_url(body.host)
+    if not is_valid_host(host):
+        raise HTTPException(400, f"'{host or body.host}' is not a valid domain name or IP address.")
+    try:
+        # TLS handshakes block; run in the threadpool like the audit.
+        return await run_in_threadpool(tls_inspector.inspect_tls, host)
+    except ValueError as exc:
+        # SSRF guard (non-public hosts) — a clean 400, never a 500.
+        raise HTTPException(400, str(exc)) from None
+
+
 # ── Live-streamed analysis (Server-Sent Events) ──────────────────────
 # Same engines, executed stage-by-stage so the UI can show the agent's
 # work as it happens. Final event payload == classic endpoint payload.
@@ -147,6 +188,27 @@ async def password_stream(body: PasswordRequest):
 @router.post("/web-audit/stream")
 async def audit_stream(body: WebAuditRequest):
     return StreamingResponse(streaming.stream_web_audit(body.url), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/message/stream")
+async def check_message_stream(body: MessageRequest):
+    if not body.text.strip():
+        raise HTTPException(400, "Paste a message to check.")
+    return StreamingResponse(streaming.stream_message(body.text), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/domain/stream")
+async def check_domain_stream(body: DomainRequest):
+    domain = _checked_domain(body.domain)
+    return StreamingResponse(streaming.stream_domain(domain), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/tls/stream")
+async def check_tls_stream(body: TlsRequest):
+    host = host_from_url(body.host)
+    if not is_valid_host(host):
+        raise HTTPException(400, f"'{host or body.host}' is not a valid domain name or IP address.")
+    return StreamingResponse(streaming.stream_tls(host), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.get("/history")

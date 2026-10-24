@@ -57,6 +57,22 @@ class WebAuditRequest(BaseModel):
     _clean_url = field_validator("url")(_reject_whitespace)
 
 
+class MessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+
+
+class DomainRequest(BaseModel):
+    domain: str = Field(min_length=3, max_length=253)
+
+    _clean_domain = field_validator("domain")(_reject_whitespace)
+
+
+class TlsRequest(BaseModel):
+    host: str = Field(min_length=3, max_length=2048)
+
+    _clean_host = field_validator("host")(_reject_whitespace)
+
+
 class VaultCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     secret: str = Field(min_length=1, max_length=10000)

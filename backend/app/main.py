@@ -59,6 +59,9 @@ THREAT_MODEL = [
     {"threat": "Credential stuffing after breaches", "module": "Breach Check (k-anonymity)", "endpoint": "POST /api/tools/password/breach"},
     {"threat": "Theft of stored secrets", "module": "Encrypted Vault (AES-256-GCM)", "endpoint": "/api/vault"},
     {"threat": "MITM / unsafe websites", "module": "Website Audit (TLS & headers)", "endpoint": "POST /api/tools/web-audit"},
+    {"threat": "Scam SMS / WhatsApp messages", "module": "Scam Message Checker", "endpoint": "POST /api/tools/message"},
+    {"threat": "Domain spoofing (no SPF/DMARC)", "module": "Domain Security Checker", "endpoint": "POST /api/tools/domain"},
+    {"threat": "Expired / mismatched TLS certificates", "module": "TLS Certificate Inspector", "endpoint": "POST /api/tools/tls"},
     {"threat": "Brute force against Aegis itself", "module": "Argon2id + lockout + rate limiting", "endpoint": "/api/auth/*"},
 ]
 
@@ -71,7 +74,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.5.0",
+    version="1.6.0",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
 )
@@ -102,7 +105,7 @@ app.include_router(vault_router.router)
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.5.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.6.0"}
 
 
 @app.get("/api", tags=["ops"])
