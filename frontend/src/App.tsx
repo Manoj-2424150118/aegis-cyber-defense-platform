@@ -29,6 +29,45 @@ const TOOL_NAV = [
 
 const PROOF = ["9 live security tools", "Live agent view", "No sign-up needed", "Files never stored", "Open source · MIT"] as const;
 
+type ThemeMode = "auto" | "light" | "dark";
+
+/** Auto theme follows the clock: light 07:00–19:00 local, dark at night. */
+function resolvedTheme(mode: ThemeMode): "light" | "dark" {
+  if (mode !== "auto") return mode;
+  const h = new Date().getHours();
+  return h >= 7 && h < 19 ? "light" : "dark";
+}
+
+function ThemeToggle() {
+  const [mode, setMode] = useState<ThemeMode>(
+    () => (document.documentElement.dataset.themeMode as ThemeMode) || "auto",
+  );
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme(mode);
+    document.documentElement.dataset.themeMode = mode;
+    try { localStorage.setItem("aegis-theme", mode); } catch { /* storage unavailable */ }
+  }, [mode, tick]);
+  useEffect(() => {
+    if (mode !== "auto") return;
+    const t = setInterval(() => setTick((x) => x + 1), 60_000); // flip at 07:00 / 19:00 without a reload
+    return () => clearInterval(t);
+  }, [mode]);
+  const next: ThemeMode = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
+  const label = mode === "auto" ? "🌓 Auto" : mode === "light" ? "☀️ Light" : "🌙 Dark";
+  return (
+    <button
+      type="button"
+      className="theme-toggle"
+      onClick={() => setMode(next)}
+      title="Theme — Auto follows day & night (light 7am–7pm). Click to switch to Light or Dark."
+      aria-label={`Theme is ${mode}. Switch to ${next}.`}
+    >
+      {label}
+    </button>
+  );
+}
+
 const FAQS = [
   {
     q: "Is Aegis really free?",
@@ -136,6 +175,7 @@ export default function App() {
           <a href="#how">How it works</a>
           <a href="#faq">FAQ</a>
           <a href={REPO} target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+          <ThemeToggle />
           <span className="live-pill" title="Live platform status">
             <span className={version ? "live-dot" : "live-dot off"}>●</span>
             {version ? ` Live · v${version}` : " Live demo"}

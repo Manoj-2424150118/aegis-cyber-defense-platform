@@ -20,10 +20,49 @@
   --low: #fb923c;
   --bad: #ef4444;
   --info: #7dd3fc;
+  --nav-bg: rgba(3, 7, 18, 0.88);
   --radius: 14px;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* ---------- Light theme ----------
+   Same design system, daylight palette. Applied via
+   <html data-theme="light">; the default (no attribute) is dark.
+   The live console intentionally stays a dark terminal in both. */
+:root[data-theme="light"] {
+  --bg: #f2f5f8;
+  --surface: #ffffff;
+  --surface-2: #edf1f5;
+  --glass: rgba(255, 255, 255, 0.85);
+  --line: #d3dce4;
+  --line-soft: #dfe7ee;
+  --text: #0b1522;
+  --muted: #4d5d6e;
+  --faint: #7e8ea0;
+  --accent-cyan: #0a8ca3;
+  --good: #059669;
+  --warn: #b45309;
+  --low: #ea580c;
+  --bad: #dc2626;
+  --info: #0284c7;
+  --nav-bg: rgba(242, 245, 248, 0.9);
+}
+:root[data-theme="light"] ::selection { background: rgba(10, 140, 163, 0.18); }
+:root[data-theme="light"] .card:hover,
+:root[data-theme="light"] .coverage-card:hover,
+:root[data-theme="light"] .step-card:hover,
+:root[data-theme="light"] .oss-band:hover { box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(10, 140, 163, 0.12); }
+:root[data-theme="light"] .hero-scan:focus-within { border-color: rgba(10, 140, 163, 0.5); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12), 0 0 0 3px rgba(10, 140, 163, 0.14); }
+:root[data-theme="light"] input:focus, :root[data-theme="light"] textarea:focus { box-shadow: 0 0 0 3px rgba(10, 140, 163, 0.16); }
+:root[data-theme="light"] .tool-nav a:hover { border-color: rgba(10, 140, 163, 0.45); }
+:root[data-theme="light"] .hero::before { opacity: 0.55; }
+.theme-toggle {
+  font: inherit; font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 999px; padding: 0.38rem 0.8rem; cursor: pointer;
+}
+.theme-toggle:hover { background: var(--surface-2); border-color: var(--accent-cyan); color: var(--text); }
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
@@ -44,7 +83,7 @@ a { color: var(--accent); }
   position: sticky; top: 0; z-index: 50;
   display: flex; justify-content: space-between; align-items: center;
   padding: 0.9rem 0.2rem;
-  background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(12px);
+  background: var(--nav-bg); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line-soft);
 }
 .brand { display: flex; align-items: center; gap: 0.5rem; color: var(--text); text-decoration: none; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.02em; }
@@ -124,7 +163,7 @@ section[id], .card[id], #tool-vault { scroll-margin-top: 128px; }
 .tool-nav {
   position: sticky; top: 57px; z-index: 40;
   display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.65rem 0.1rem; margin-bottom: 0.6rem;
-  background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(12px);
+  background: var(--nav-bg); backdrop-filter: blur(12px);
   scrollbar-width: none;
 }
 .tool-nav::-webkit-scrollbar { display: none; }
@@ -134,25 +173,14 @@ section[id], .card[id], #tool-vault { scroll-margin-top: 128px; }
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .tool-nav a:hover { color: var(--text); border-color: rgba(0, 240, 255, 0.4); transform: translateY(-1px); }
-/* Symmetric tool grid: every card in a row stretches to the same
-   height, and on wide screens the nine tools form a true 3×3. */
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; align-items: stretch; }
-@media (min-width: 1280px) { .grid { grid-template-columns: repeat(3, 1fr); } }
-.tool-cell { min-width: 0; display: flex; }
-.tool-cell > .card { flex: 1; width: 100%; display: flex; flex-direction: column; }
-.tool-cell > .card .result { margin-top: auto; }
-/* Internal rhythm: every card reserves the same title zone (2 lines)
-   and description zone (3 lines), so headings, descriptions and
-   controls start at identical heights across a row — and each card's
-   main control block anchors to the bottom edge instead of leaving
-   dead space under it. Text areas and the file drop-zone grow to
-   fill their card. */
-.card-head { min-height: 2.6em; align-items: flex-start; }
-.card .hint { min-height: 4.4em; }
-.tool-cell > .card > form,
-.tool-cell > .card > .row { margin-top: auto; }
-.tool-cell > .card > textarea,
-.tool-cell > .card > .drop { flex: 1 1 auto; }
+/* Masonry flow: every card is exactly as tall as its own content and
+   cards pack adjacently down independent columns — a short tool sits
+   right under the previous one instead of being stretched into a
+   tall, mostly-empty box by a taller neighbour. */
+.grid { columns: 1; column-gap: 1rem; }
+@media (min-width: 760px) { .grid { columns: 2; } }
+@media (min-width: 1280px) { .grid { columns: 3; } }
+.tool-cell { break-inside: avoid; margin-bottom: 1rem; }
 .tool-filter { display: flex; align-items: center; gap: 0.8rem; margin: 0.2rem 0 1rem; }
 .tool-filter input { max-width: 420px; }
 .filter-count { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent-cyan); white-space: nowrap; }
