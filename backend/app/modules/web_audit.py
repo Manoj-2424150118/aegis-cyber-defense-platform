@@ -16,6 +16,7 @@ import urllib.request
 from urllib.parse import urlparse
 
 from app.modules.remediation import fix_for
+from app.validation import is_valid_host
 
 
 class UnsafeUrlError(ValueError):
@@ -33,6 +34,12 @@ def assert_public_host(hostname: str) -> None:
     """
     if not hostname:
         raise UnsafeUrlError("URL has no host.")
+    if not is_valid_host(hostname):
+        # Strict format gate before any DNS work: the audit performs an
+        # outbound fetch, so its target must be a well-formed domain or
+        # IP literal (see app/validation.py). Underscore hosts, bad
+        # octets like 999.1.1.1, and other malformed names stop here.
+        raise UnsafeUrlError(f"'{hostname}' is not a valid domain name or IP address.")
     try:
         infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
     except socket.gaierror as exc:
