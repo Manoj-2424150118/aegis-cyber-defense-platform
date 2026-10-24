@@ -15,6 +15,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
+
+
+class SelectiveGZipMiddleware(GZipMiddleware):
+    """Gzip for ordinary responses (smaller payloads = the origin
+    survives traffic spikes), but never for the SSE analysis streams:
+    compressing a live event stream would buffer the agent's steps and
+    break the live console's incremental rendering."""
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").endswith("/stream"):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
 
 from app.config import settings
 from app.db import init_db
@@ -57,13 +71,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.4.0",
+    version="1.5.0",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
 )
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SelectiveGZipMiddleware, minimum_size=1024)
 
 
 @app.exception_handler(Exception)
@@ -87,7 +102,7 @@ app.include_router(vault_router.router)
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.4.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.5.0"}
 
 
 @app.get("/api", tags=["ops"])
