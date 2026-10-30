@@ -12,6 +12,8 @@
 
 ### ▶️ **Live demo: [aegis-cyber-defense-platform.onrender.com](https://aegis-cyber-defense-platform.onrender.com)** — no sign-up needed to check a link, email, file or password. *(Free-tier hosting: the first load after idle can take ~1 minute while the service wakes up.)*
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Manoj-2424150118/aegis-cyber-defense-platform) — one-click deploy of your own instance (free tier, uses this repo's `render.yaml` Blueprint).
+
 > **One platform that protects an individual user against today's most common cyber threats** — phishing links, phishing/BEC email, malware attachments, weak and breached passwords, stolen secrets, and unsafe websites — built as a production-grade full-stack application with defence-in-depth applied to itself.
 
 Built by [Manoj Kumar Sharma](https://github.com/Manoj-2424150118) — Cybersecurity & Software Professional (MCA, Manipal University Jaipur).
