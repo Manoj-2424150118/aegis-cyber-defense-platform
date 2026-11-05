@@ -9,9 +9,58 @@ frame-ancestors, X-Content-Type-Options, Referrer-Policy, cookie flags
 Only public headers are read; no intrusive probing is performed.
 """
 
+import ipaddress
+import socket
 import ssl
 import urllib.request
 from urllib.parse import urlparse
+
+from app.modules.remediation import fix_for
+from app.validation import is_valid_host
+
+
+class UnsafeUrlError(ValueError):
+    """Raised when a URL points at a non-public address (SSRF guard)."""
+
+
+def assert_public_host(hostname: str) -> None:
+    """Reject loopback / private / link-local / reserved targets.
+
+    Without this, the audit endpoint is a textbook SSRF primitive: anyone
+    could make the server fetch cloud metadata (169.254.169.254) or internal
+    admin panels. Every hostname is resolved and *every* resulting address
+    must be a public one. Redirect targets are re-checked by the opener
+    below, which closes the redirect-to-internal bypass.
+    """
+    if not hostname:
+        raise UnsafeUrlError("URL has no host.")
+    if not is_valid_host(hostname):
+        # Strict format gate before any DNS work: the audit performs an
+        # outbound fetch, so its target must be a well-formed domain or
+        # IP literal (see app/validation.py). Underscore hosts, bad
+        # octets like 999.1.1.1, and other malformed names stop here.
+        raise UnsafeUrlError(f"'{hostname}' is not a valid domain name or IP address.")
+    try:
+        infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise UnsafeUrlError(f"Host '{hostname}' does not resolve.") from exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise UnsafeUrlError(
+                f"Refusing to audit '{hostname}': it resolves to a non-public address ({ip})."
+            )
+
+
+class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
+    max_redirections = 3
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parsed = urlparse(newurl)
+        if parsed.scheme not in ("http", "https"):
+            raise UnsafeUrlError("Redirect to a non-HTTP scheme was blocked.")
+        assert_public_host(parsed.hostname or "")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 REQUIRED_HEADERS = {
     "strict-transport-security": (20, "HSTS forces browsers to use HTTPS, blocking downgrade / MITM attacks."),
@@ -55,17 +104,52 @@ def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: 
             cookie_issues.append("a cookie without HttpOnly (readable by scripts — XSS can steal it)")
         if "samesite" not in c:
             cookie_issues.append("a cookie without SameSite (CSRF risk)")
-    if cookies and not cookie_issues:
+    if not cookies:
+        # No cookies = no cookie attack surface (nothing to hijack, steal
+        # or abuse for CSRF). That is at least as safe as perfectly-flagged
+        # cookies, so the category earns full marks — with the reasoning
+        # shown, never silently.
+        score += 15
+        findings.append({"points": 15, "code": "no-cookies", "message": "No cookies are set — there is no cookie attack surface at all (nothing to hijack, steal, or abuse for CSRF), so this category earns full marks."})
+    elif not cookie_issues:
         score += 15
         findings.append({"points": 15, "code": "cookies-ok", "message": "Cookies carry Secure, HttpOnly and SameSite protections."})
-    elif cookies:
+    else:
         findings.append({"points": 0, "code": "cookie-flags", "message": "Cookie problems: " + "; ".join(sorted(set(cookie_issues))) + "."})
     if "server" in lower and any(ch.isdigit() for ch in lower["server"]):
         findings.append({"points": 0, "code": "server-version", "message": f"Server banner leaks version details ('{lower['server']}') that help attackers pick exploits."})
-    else:
-        score += 0  # neutral — no finding needed beyond the header set
+    if "x-powered-by" in lower:
+        findings.append({"points": 0, "code": "x-powered-by", "message": f"X-Powered-By advertises the stack ('{lower['x-powered-by']}') — free reconnaissance for attackers."})
+    if lower.get("access-control-allow-origin", "").strip() == "*":
+        findings.append({"points": 0, "code": "cors-wildcard", "message": "CORS allows ANY website to read responses (Access-Control-Allow-Origin: *) — dangerous for APIs holding user data."})
+    if https and "cache-control" not in lower:
+        findings.append({"points": 0, "code": "cache-control", "message": "No Cache-Control header — browsers and proxies may keep copies of sensitive pages. Add no-store on pages with logins, payments or personal data."})
     score = min(score, 100)
+    for f in findings:
+        f.setdefault("fix", fix_for(f["code"], audience="owner"))
     return {"url": url, "score": score, "grade": grade_for(score), "findings": findings}
+
+
+def _fetch_guarded(url: str, timeout: float = 8.0):
+    """Fetch ``url`` following only SSRF-safe redirects (guard re-checked
+    on every hop by the redirect handler). Returns (final_url, headers,
+    cookies). Caller must have validated scheme + host already."""
+    # Browser-compatible UA with the scanner identified in the
+    # comment field (the Googlebot convention): some sites serve a
+    # stripped bot-variant page with most security headers missing,
+    # and the audit should grade what a real visitor's browser
+    # receives — while still honestly naming the scanner.
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (compatible; Aegis-Security-Audit/1.6; +https://aegis-cyber-defense-platform.onrender.com)"},
+        method="GET",
+    )
+    ctx = ssl.create_default_context()
+    opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
+    with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced by caller + handler
+        headers = dict(resp.headers.items())
+        cookies = resp.headers.get_all("Set-Cookie") or []
+        return resp.geturl(), headers, cookies
 
 
 def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
@@ -75,19 +159,15 @@ def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise ValueError("Only http/https URLs can be audited.")
-    req = urllib.request.Request(url, headers={"User-Agent": "Aegis-Security-Audit/1.0"}, method="GET")
-    ctx = ssl.create_default_context()
+    assert_public_host(parsed.hostname or "")
     try:
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:  # nosec B310 - scheme allowlist enforced above
-            headers = dict(resp.headers.items())
-            cookies = resp.headers.get_all("Set-Cookie") or []
-            final_url = resp.geturl()
+        final_url, headers, cookies = _fetch_guarded(url, timeout)
     except ValueError:
         raise
     except Exception as exc:
         return {
             "url": raw_url, "score": 0, "grade": "F", "reachable": False,
-            "findings": [{"points": 0, "code": "unreachable", "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS."}],
+            "findings": [{"points": 0, "code": "unreachable", "message": f"Could not fetch the site safely: {exc.__class__.__name__}. It may be offline, blocking audits, or using invalid TLS.", "fix": fix_for("unreachable", audience="owner")}],
         }
     result = audit_headers(final_url, headers, cookies, https=final_url.startswith("https://"))
     result["reachable"] = True

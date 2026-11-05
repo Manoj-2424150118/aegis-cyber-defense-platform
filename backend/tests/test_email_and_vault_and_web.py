@@ -65,3 +65,20 @@ def test_web_audit_good_site():
 def test_web_audit_bad_site():
     r = audit_headers("http://example.com", {}, [], https=False)
     assert r["grade"] == "F"
+
+
+def test_web_audit_no_cookies_earns_full_cookie_marks():
+    """A site that sets no cookies has no cookie attack surface: the
+    category must award its 15 points with an explicit finding, not
+    silently cap the score (regression: Aegis self-audit stuck at 85)."""
+    headers = {
+        "Strict-Transport-Security": "max-age=31536000",
+        "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=()",
+    }
+    r = audit_headers("https://example.com", headers, [], https=True)
+    assert r["score"] == 100
+    assert r["grade"] == "A"
+    assert any(f["code"] == "no-cookies" and f["points"] == 15 for f in r["findings"])

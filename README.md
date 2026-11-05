@@ -8,6 +8,11 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Try_Aegis_online-46E3B7?style=for-the-badge)](https://aegis-cyber-defense-platform.onrender.com)
+
+### ▶️ **Live demo: [aegis-cyber-defense-platform.onrender.com](https://aegis-cyber-defense-platform.onrender.com)** — no sign-up needed to check a link, email, file or password. *(Free-tier hosting: the first load after idle can take ~1 minute while the service wakes up.)*
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Manoj-2424150118/aegis-cyber-defense-platform) — one-click deploy of your own instance (free tier, uses this repo's `render.yaml` Blueprint).
 
 > **One platform that protects an individual user against today's most common cyber threats** — phishing links, phishing/BEC email, malware attachments, weak and breached passwords, stolen secrets, and unsafe websites — built as a production-grade full-stack application with defence-in-depth applied to itself.
 
@@ -28,7 +33,13 @@ Most people don't get hacked by nation-state zero-days. They get hacked by:
 
 Aegis gives a non-technical user one place to check each of these *before* it hurts them — and it practises what it preaches: the platform itself is hardened against the OWASP Top 10.
 
-## ✨ The six protection modules
+**Live Agent View (v1.2):** every analysis is streamed to the browser stage-by-stage over Server-Sent Events — you watch the agent parse, verify authentication, hunt indicators and score risk *as each check actually executes*, with the findings and running score landing live in a terminal-style console. No black box, no spinner theatre: the streamed result is byte-for-byte the classic API result (parity is enforced by tests).
+
+**Suggested fixes (v1.3):** every finding in every report ships a concrete **Suggested fix** — what to do, step by step, written for the person holding the report (end users for links/emails/files; site owners for audits, down to the exact config flag). A report should end the problem, not just name it. A test enforces that no finding can ship without one. Detection coverage also expanded: dangerous `javascript:`/`data:` schemes, numeric/hex/octal-obfuscated IPs, executable & archive downloads, open-redirect parameters, BEC wire-fraud and gift-card language, mshta/rundll32/AMSI-bypass/credential-theft indicators, the EICAR test file, and X-Powered-By / CORS-wildcard / cache-control audit checks.
+
+**License:** MIT — free for everyone, forever. Use it, fork it, modify it, self-host it. See `LICENSE` and `CONTRIBUTING.md`.
+
+## ✨ The nine protection modules
 
 | # | Threat (real-world attack) | Module | What it detects / does |
 |---|---|---|---|
@@ -39,6 +50,9 @@ Aegis gives a non-technical user one place to check each of these *before* it hu
 | 5 | Credential stuffing after breaches | **Breach Check** | Have-I-Been-Pwned **k-anonymity** range API — only 5 hex chars of the SHA-1 hash ever leave the machine; offline fallback list when the network is down |
 | 6 | Theft of stored secrets | **Encrypted Vault** | **AES-256-GCM** authenticated encryption, key derived from the user's master password with **Argon2id**. The server stores ciphertext only — a database leak reveals nothing. Tampering and wrong passwords are detected by the GCM tag |
 | + | MITM & unsafe websites | **Website Audit** | Grades any site A–F on HTTPS/HSTS, CSP, X-Frame-Options, MIME-sniffing, Referrer/Permissions policy and cookie flags (Secure/HttpOnly/SameSite) |
+| 7 | Scam SMS / WhatsApp messages | **Scam Message Checker** | Digital-arrest & agency impersonation, KYC/account-block threats, OTP/PIN harvesting, UPI payment redirection, Telegram task scams, prize/cashback bait, crypto-doubling — and it extracts and re-scores every link in the message with Module 1 |
+| 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (incl. invalid multiple records and ~all softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
+| 9 | Expired / mismatched certificates | **TLS Certificate Inspector** | Real TLS handshake: chain verification, hostname/SAN coverage (with wildcards), expiry runway, protocol version — with an unverified re-handshake to report broken certificates instead of hiding them |
 
 ## 🏗️ Architecture
 
@@ -118,6 +132,9 @@ curl -s -X POST localhost:8000/api/tools/url \
 | POST | `/api/tools/password/breach` | – | k-anonymity breach lookup |
 | POST | `/api/tools/password/generate` | – | Secure password + passphrase |
 | POST | `/api/tools/web-audit` | – | Website security grade |
+| POST | `/api/tools/message` | – | Scam SMS/WhatsApp message analysis |
+| POST | `/api/tools/domain` | – | Domain SPF/DMARC/CAA security grade |
+| POST | `/api/tools/tls` | – | TLS certificate inspection |
 | POST | `/api/auth/register` · `/login` · `/refresh` | – | Argon2id + JWT auth with lockout |
 | GET/POST/DELETE | `/api/vault` | JWT | Encrypted vault CRUD |
 
@@ -126,11 +143,21 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 32 tests: engines, crypto, API, lockout, headers
+cd backend && pytest -q --cov=app     # 123 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
 CI (GitHub Actions) runs on every push/PR: **ruff → bandit → pytest+cov** (backend), **npm audit → tsc → vite build** (frontend), **docker compose build**, plus **CodeQL** SAST and weekly **Dependabot** updates.
+
+### Hardening & QA (v1.1)
+Before the v1.1 deployment the platform went through a dedicated security review and an isolated-sandbox QA battery (`scripts/qa_battery.py`: functional checks, an attack suite — SSRF, SQLi, forged JWT, oversized uploads, brute force — 46 fuzz payloads, and a 100-request deterministic load loop). Findings were fixed and locked in as regression tests (`backend/tests/test_security.py`):
+
+- **SSRF**: the website-audit fetcher now resolves targets and refuses loopback/private/link-local/reserved addresses, and re-validates every redirect hop (cloud-metadata endpoints are unreachable through it)
+- **Upload DoS**: uploads are read in capped chunks — an oversized file is rejected at the limit, never buffered whole in memory
+- **Auth**: timing-equalised login errors (no user enumeration), registration rejects common/repetitive passwords, per-IP rate limits key correctly behind the hosting proxy, `/health` exempt
+- **Crash-proofing**: malformed URLs (`javascript:…`, non-numeric ports) can no longer produce a 500; a global handler returns generic errors with a request ID, never a stack trace
+- **Dependencies**: all backend and frontend packages upgraded to current versions — `pip-audit` reports **no known vulnerabilities**
+- Full results: [docs/QA_REPORT.md](docs/QA_REPORT.md)
 
 ## 🗂️ Project structure
 
@@ -145,7 +172,7 @@ CI (GitHub Actions) runs on every push/PR: **ruff → bandit → pytest+cov** (b
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 32 pytest tests
+│   ├── tests/                 # 123 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module
