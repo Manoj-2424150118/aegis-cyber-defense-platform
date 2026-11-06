@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, validateLookupTarget } from "../api";
+import { api, validateLookupTarget, type RedirectTrace } from "../api";
 import { copyText, ErrorNote, FindingsList, HERO_SCAN_EVENT, LiveConsole, ScoreMeter, Spinner, StrengthMeter, useLiveScan, VerdictBadge } from "./Shared";
 
 const PHISH_URL = "http://192.168.10.5/paypa1-secure-login.xyz/verify?account=suspended";
@@ -13,6 +13,10 @@ const PHISH_BODY = "Urgent! Your account will be closed within 24 hours. Confirm
 export function UrlChecker() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
+  const [trace, setTrace] = useState<RedirectTrace | null>(null);
+  const [tracing, setTracing] = useState(false);
+  const [traceError, setTraceError] = useState("");
+  const [copiedClean, setCopiedClean] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.checkUrl>> | null>(null);
   type R = Awaited<ReturnType<typeof api.checkUrl>>;
   const scan = useLiveScan<R>();
@@ -27,13 +31,20 @@ export function UrlChecker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   async function run(value: string) {
-    setError(""); setResult(null);
+    setError(""); setResult(null); setTrace(null); setTraceError("");
     const invalid = validateLookupTarget(value, "score");
     if (invalid) { setError(invalid); return; }
     try {
       const r = await scan.run((h) => api.checkUrlStream(value, h));
       if (r) setResult(r);
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+  }
+  async function runTrace() {
+    setTracing(true); setTraceError(""); setTrace(null);
+    try {
+      setTrace(await api.resolveUrl(url));
+    } catch (err) { setTraceError(err instanceof Error ? err.message : "Trace failed"); }
+    finally { setTracing(false); }
   }
   return (
     <section className="card" id="tool-url">
@@ -54,6 +65,37 @@ export function UrlChecker() {
           <div className="result-head"><span>Risk assessment</span><VerdictBadge score={result.risk_score} verdict={result.verdict} /></div>
           <ScoreMeter score={100 - result.risk_score} />
           <FindingsList findings={result.findings} />
+          {result.trackers && result.trackers.length > 0 && (
+            <div className="trace-box">
+              <p className="trace-title">Trackers in this link</p>
+              <ul className="findings">
+                {result.trackers.map((t, i) => (
+                  <li key={i}><span className="finding-points hit">•</span><span>{t.type === "parameter" ? <>Tracking parameter: <code>{t.name}</code></> : t.type === "redirect-wrapper" ? <>Redirect wrapper: <code>{t.name}</code></> : <>Wrapped destination: <code>{t.name}</code></>}</span></li>
+                ))}
+              </ul>
+              {result.cleaned_url && (
+                <form className="row" onSubmit={(e) => e.preventDefault()}>
+                  <input readOnly value={result.cleaned_url} aria-label="Cleaned link without trackers" />
+                  <button type="button" onClick={() => void copyText(result.cleaned_url!, setCopiedClean)}>{copiedClean ? "Copied ✓" : "Copy clean link"}</button>
+                </form>
+              )}
+            </div>
+          )}
+          <div className="samples">
+            <button type="button" className="sample" disabled={tracing} onClick={() => void runTrace()}>{tracing ? "Tracing…" : "Trace where this link really goes"}</button>
+          </div>
+          <ErrorNote error={traceError} />
+          {trace && (
+            <div className="trace-box">
+              <p className="trace-title">Redirect chain — {trace.hops} hop{trace.hops === 1 ? "" : "s"}{trace.crossed_domains ? " · crossed domains" : ""}</p>
+              <ol className="chain">
+                {trace.chain.map((s, i) => <li key={i}><code>{s.status}</code> <span>{s.url}</span></li>)}
+              </ol>
+              {trace.error
+                ? <p className="hint">{trace.error}</p>
+                : <p className="hint">Final destination: <strong>{trace.final_verdict}</strong> ({trace.final_risk_score}/100 risk)</p>}
+            </div>
+          )}
         </div>
       )}
     </section>

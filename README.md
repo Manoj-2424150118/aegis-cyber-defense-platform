@@ -125,8 +125,10 @@ curl -s -X POST localhost:8000/api/tools/url \
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
-| POST | `/api/tools/url` | – | Phishing URL analysis |
-| POST | `/api/tools/email` | – | Phishing email analysis |
+| POST | `/api/tools/url` | – | Phishing URL analysis + tracker detection & cleaned link |
+| POST | `/api/tools/url/resolve` | – | Redirect-chain trace to the real destination (SSRF-guarded) |
+| POST | `/api/tools/email` | – | Phishing email analysis + tracking-pixel & hidden-text detection |
+| GET | `/api/public/trending` | – | Live scam trends from privacy-safe scan aggregates |
 | POST | `/api/tools/file` | – | Malware static scan (multipart, ≤10 MB) |
 | POST | `/api/tools/password/assess` | – | Strength, entropy, crack time |
 | POST | `/api/tools/password/breach` | – | k-anonymity breach lookup |
@@ -143,7 +145,7 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 123 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf
+cd backend && pytest -q --cov=app     # 136 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf, trackers, redirect tracer, trends
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 

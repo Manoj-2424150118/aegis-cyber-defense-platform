@@ -18,7 +18,7 @@ import ipaddress
 import math
 import re
 from dataclasses import dataclass, field
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from app.modules.remediation import fix_for
 
@@ -30,6 +30,28 @@ BRANDS = {
     "facebook": "facebook.com", "instagram": "instagram.com", "whatsapp": "whatsapp.com",
     "sbi": "sbi.co.in", "hdfc": "hdfcbank.com", "icici": "icicibank.com",
     "paytm": "paytm.com", "phonepe": "phonepe.com", "upi": "npci.org.in",
+}
+# Query parameters whose only job is to track the clicker across sites.
+# They carry no content, so the report names them and offers a cleaned
+# URL with them stripped.
+TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_name", "fbclid", "gclid", "dclid", "gbraid", "wbraid",
+    "msclkid", "ttclid", "twclid", "li_fat_id", "igshid", "igsh", "yclid",
+    "mc_cid", "mc_eid", "_ga", "_gl", "_hsenc", "_hsmi", "hsctatracking",
+    "vero_id", "vero_conv", "wickedid", "oly_anon_id", "oly_enc_id",
+    "rb_clickid", "s_cid", "ref_src", "ref_url", "spm", "scm", "icid",
+    "mkt_tok", "elqtrackid", "trk_contact", "trk_msg", "trk_module",
+}
+# Hosts that exist to wrap a real destination in a tracking redirect —
+# social link shims and marketing-email click trackers. The destination
+# the user sees is not the destination they reach.
+TRACKING_WRAPPERS = {
+    "l.facebook.com", "lm.facebook.com", "l.instagram.com",
+    "click.mailchimp.com", "mailchi.mp", "track.customer.io",
+    "links.iterable.com", "ct.sendgrid.net", "u.ct.sendgrid.net",
+    "trk.klaviyomail.com", "click.pstmrk.it",
+    "links.marketo.net", "click.hs-analytics.net", "t.hsms03.com",
 }
 PHISH_KEYWORDS = [
     "verify", "login", "signin", "secure", "account", "update", "confirm",
@@ -62,11 +84,14 @@ class UrlReport:
     risk_score: int
     verdict: str
     findings: list[dict] = field(default_factory=list)
+    trackers: list[dict] = field(default_factory=list)
+    cleaned_url: str | None = None
 
     def as_dict(self) -> dict:
         return {
             "url": self.url, "risk_score": self.risk_score,
             "verdict": self.verdict, "findings": self.findings,
+            "trackers": self.trackers, "cleaned_url": self.cleaned_url,
         }
 
 
@@ -99,6 +124,8 @@ class _UrlContext:
         self.sld = self.labels[-2] if len(self.labels) >= 2 else ""
         self.findings: list[dict] = []
         self.score = 0
+        self.trackers: list[dict] = []
+        self.cleaned_url: str | None = None
 
     def add(self, points: int, code: str, message: str) -> None:
         self.score += points
@@ -202,12 +229,47 @@ def _stage_path(ctx: _UrlContext) -> None:
         ctx.add(15, "redirect-param", "URL carries an open-redirect parameter — the first page can bounce you somewhere else entirely.")
 
 
+def _stage_trackers(ctx: _UrlContext) -> None:
+    """Trackers & redirect wrappers: who else learns about the click?
+
+    Tracking parameters don't make a link malicious, but they do leak
+    the click to ad networks — and on a phishing link they are how the
+    operator knows the bait worked. The report names every tracker and
+    builds a cleaned URL with the tracking parameters stripped.
+    """
+    parsed = ctx.parsed
+    pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    tracking = [(k, v) for k, v in pairs if k.lower() in TRACKING_PARAMS or k.lower().startswith("utm_")]
+    if tracking:
+        names = sorted({k for k, _ in tracking})
+        for name in names:
+            ctx.trackers.append({"type": "parameter", "name": name})
+        ctx.add(5, "tracking-params", f"Link carries {len(names)} tracking parameter(s) — {', '.join(names[:6])} — that report your click to marketing/ad networks. A cleaned link is provided below.")
+        kept = [(k, v) for k, v in pairs if not (k.lower() in TRACKING_PARAMS or k.lower().startswith("utm_"))]
+        ctx.cleaned_url = urlunparse(parsed._replace(query=urlencode(kept)))
+    if ctx.host in TRACKING_WRAPPERS or parsed.path.startswith("/slink"):
+        ctx.trackers.append({"type": "redirect-wrapper", "name": ctx.host})
+        ctx.add(10, "tracking-wrapper", f"This link routes through {ctx.host}, a tracking redirect service — the destination you see is not the destination you reach, and the operator logs your click.")
+    # Wrapped destinations: google.com/url?q=…, facebook l.php?u=… hide
+    # the real target inside a parameter of a trusted-looking domain.
+    params = parse_qs(parsed.query)
+    for key in ("q", "u", "url", "target"):
+        for value in params.get(key, []):
+            decoded = unquote(value)
+            if decoded.startswith(("http://", "https://")) and urlparse(decoded).hostname not in (None, "", ctx.host):
+                inner = urlparse(decoded).hostname
+                ctx.trackers.append({"type": "wrapped-destination", "name": inner or ""})
+                ctx.add(10, "wrapped-destination", f"The visible address is a wrapper — the link actually leads to {inner}. Always judge the final destination, not the wrapper.")
+                return
+
+
 URL_STAGES = [
     ("Parsing the address", _stage_parse),
     ("Transport security — HTTPS & port", _stage_transport),
     ("Host reputation — IP, punycode, TLD, entropy", _stage_host),
     ("Brand impersonation & typosquatting", _stage_brand),
     ("Path & payload heuristics", _stage_path),
+    ("Trackers & redirect wrappers", _stage_trackers),
 ]
 
 
@@ -235,4 +297,42 @@ def analyze_url(raw_url: str) -> UrlReport:
     findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No phishing or malware-delivery signals detected.", "fix": fix_for("clean")})
-    return UrlReport(url=raw_url, risk_score=score, verdict=_verdict(score), findings=findings)
+    return UrlReport(url=raw_url, risk_score=score, verdict=_verdict(score), findings=findings,
+                     trackers=ctx.trackers, cleaned_url=ctx.cleaned_url)
+
+
+def impersonated_brand(raw_url: str) -> str | None:
+    """The brand a URL imitates, if any — used for privacy-safe trend
+    statistics (brand names only, never the full URL)."""
+    url = raw_url.strip()
+    if "://" not in url:
+        url = "http://" + url
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return None
+    labels = host.split(".")
+    registrable = ".".join(labels[-2:]) if len(labels) >= 2 else host
+    leet = host.translate(str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"}))
+    sld = labels[-2] if len(labels) >= 2 else ""
+    candidates = {sld, *sld.split("-")} if sld else set()
+    for brand, official in BRANDS.items():
+        if registrable == official or host.endswith("." + official):
+            continue
+        if brand in host or brand in leet:
+            return brand
+        if len(brand) >= 4 and any(c and c != brand and _levenshtein(c, brand) in (1, 2) for c in candidates):
+            return brand
+    return None
+
+
+def registrable_domain(raw_url: str) -> str | None:
+    """Last two host labels (paypa1-secure.xyz) — the most that trend
+    statistics may store about a checked link."""
+    url = raw_url.strip()
+    if "://" not in url:
+        url = "http://" + url
+    host = (urlparse(url).hostname or "").lower()
+    if not host:
+        return None
+    labels = host.split(".")
+    return ".".join(labels[-2:]) if len(labels) >= 2 else host

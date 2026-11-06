@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { api, type Trending } from "./api";
 import { DomainChecker, EmailAnalyzer, FileScanner, MessageChecker, PasswordLab, TlsInspector, UrlChecker, WebAudit } from "./components/Tools";
 import { VaultPanel } from "./components/VaultPanel";
 import { HERO_SCAN_EVENT } from "./components/Shared";
@@ -94,6 +95,50 @@ const SAFE_SAMPLE = "https://www.google.com";
 function dispatchHeroScan(url: string) {
   window.dispatchEvent(new CustomEvent(HERO_SCAN_EVENT, { detail: url }));
   document.getElementById("tool-url")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function TrendingSection() {
+  const [data, setData] = useState<Trending | null>(null);
+  useEffect(() => {
+    let live = true;
+    api.getTrending().then((d) => { if (live) setData(d); }).catch(() => { /* trends are a bonus, never block the page */ });
+    return () => { live = false; };
+  }, []);
+  if (!data) return null;
+  return (
+    <section id="trending" className="section">
+      <h2 className="section-title">Trending threats</h2>
+      <p className="section-sub">What people are actually checking right now — live aggregates from this platform's own scans over the last {data.window_days} days. Only verdicts, impersonated brand names and repeat flagged domains are counted; submitted links, emails and messages are never stored or shown.</p>
+      {data.total_scans === 0 ? (
+        <p className="meta">The counters opened with this release — run any check above and you will be the first data point.</p>
+      ) : (
+        <>
+          <div className="trend-stats">
+            <div className="trend-stat"><strong>{data.total_scans}</strong><span>checks run</span></div>
+            <div className="trend-stat"><strong>{data.flagged_pct}%</strong><span>flagged risky</span></div>
+            <div className="trend-stat"><strong>{data.scans_last_7_days}</strong><span>checks this week</span></div>
+          </div>
+          <div className="trend-cols">
+            {data.top_patterns.length > 0 && (
+              <div className="trend-card"><h3>Most-seen scam patterns</h3>
+                <ol className="trend-list">{data.top_patterns.map((p) => <li key={p.code}><span>{p.label}</span><strong>{p.count}</strong></li>)}</ol>
+              </div>
+            )}
+            {data.top_impersonated_brands.length > 0 && (
+              <div className="trend-card"><h3>Most-impersonated brands</h3>
+                <ol className="trend-list">{data.top_impersonated_brands.map((b) => <li key={b.name}><span>{b.name}</span><strong>{b.count}</strong></li>)}</ol>
+              </div>
+            )}
+            {data.top_flagged_domains.length > 0 && (
+              <div className="trend-card"><h3>Repeat flagged domains</h3>
+                <ol className="trend-list">{data.top_flagged_domains.map((d) => <li key={d.domain}><span><code>{d.domain}</code></span><strong>{d.count}</strong></li>)}</ol>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
 }
 
 export default function App() {
@@ -252,6 +297,8 @@ export default function App() {
           {visibleTools.length === 0 && <p className="meta">No tool matches “{filter}”. Try a shorter word — or clear the filter to see all nine.</p>}
         </div>
       </section>
+
+      <TrendingSection />
 
       <section id="how" className="section reveal">
         <h2 className="section-title">How it works</h2>

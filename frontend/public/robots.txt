@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aegis-cyber-defense-platform.onrender.com/sitemap.xml

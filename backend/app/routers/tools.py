@@ -5,6 +5,10 @@ suspicious link should not need to register to check it). When a user is
 logged in, scans are saved to their history for the dashboard.
 """
 
+import logging
+from collections import Counter
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
@@ -12,15 +16,16 @@ from sqlalchemy.orm import Session
 
 from app import streaming
 from app.config import settings
-from app.db import get_db
+from app.db import SessionLocal, get_db
 from app.deps import get_current_user
-from app.models import ScanHistory, User
+from app.models import ScanEvent, ScanHistory, User
 from app.modules import (
     domain_checker,
     email_analyzer,
     file_scanner,
     message_analyzer,
     password_lab,
+    redirect_tracer,
     tls_inspector,
     url_analyzer,
     web_audit,
@@ -37,6 +42,8 @@ from app.schemas import (
 )
 from app.validation import host_from_url, is_valid_domain, is_valid_host
 
+logger = logging.getLogger("aegis.tools")
+
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
 
@@ -51,10 +58,56 @@ def _optional_user(db: Session = Depends(get_db)):
     return None  # anonymous by default; history is recorded via /api/history for logged-in clients
 
 
+_FLAGGED = ("suspicious", "malicious")
+
+
+def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | None = None,
+                  brand: str | None = None, codes: tuple[str, ...] | list[str] = ()) -> None:
+    """Store one privacy-safe aggregate event for the Trends view.
+
+    The flagged domain is kept only for suspicious/malicious verdicts —
+    the domains people check on safe links are nobody's business.
+    Telemetry must never break a scan, so every failure is swallowed.
+    """
+    try:
+        db = SessionLocal()
+        try:
+            db.add(ScanEvent(
+                scan_type=scan_type, verdict=verdict, risk_score=risk_score,
+                domain=domain if verdict in _FLAGGED else None,
+                brand=brand, finding_codes=",".join(codes)[:500],
+            ))
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        logger.debug("scan-event recording failed", exc_info=True)
+
+
+def _record_url_event(raw_url: str, report) -> None:
+    _record_event(
+        "url", report.verdict, report.risk_score,
+        domain=url_analyzer.registrable_domain(raw_url),
+        brand=url_analyzer.impersonated_brand(raw_url),
+        codes=[f["code"] for f in report.findings],
+    )
+
+
 @router.post("/url")
 async def check_url(body: UrlRequest):
     report = url_analyzer.analyze_url(body.url)
+    _record_url_event(body.url, report)
     return report.as_dict()
+
+
+@router.post("/url/resolve")
+async def resolve_url(body: UrlRequest):
+    """Follow a link's redirect chain (SSRF-guarded on every hop) and
+    score the final destination — the page a victim would really reach."""
+    try:
+        return await run_in_threadpool(redirect_tracer.trace_redirects, body.url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
 
 
 @router.post("/password/assess")
@@ -105,7 +158,11 @@ async def scan_upload(file: UploadFile = File(...)):
 async def check_email(body: EmailRequest):
     if not body.headers.strip() and not body.body.strip():
         raise HTTPException(400, "Provide email headers, body, or both.")
-    return email_analyzer.analyze_email(body.headers, body.body)
+    result = email_analyzer.analyze_email(body.headers, body.body)
+    _record_event("email", result["verdict"], result["risk_score"],
+                  domain=result.get("from_domain") or None,
+                  codes=[f["code"] for f in result["findings"]])
+    return result
 
 
 @router.post("/web-audit")
@@ -125,7 +182,10 @@ async def audit(body: WebAuditRequest):
 async def check_message(body: MessageRequest):
     if not body.text.strip():
         raise HTTPException(400, "Paste a message to check.")
-    return message_analyzer.analyze_message(body.text)
+    result = message_analyzer.analyze_message(body.text)
+    _record_event("message", result["verdict"], result["risk_score"],
+                  codes=[f["code"] for f in result["findings"]])
+    return result
 
 
 def _checked_domain(raw: str) -> str:
@@ -164,14 +224,28 @@ _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 @router.post("/url/stream")
 async def check_url_stream(body: UrlRequest):
-    return StreamingResponse(streaming.stream_url(body.url), media_type="text/event-stream", headers=_SSE_HEADERS)
+    async def gen():
+        async for chunk in streaming.stream_url(body.url):
+            yield chunk
+        _record_url_event(body.url, url_analyzer.analyze_url(body.url))
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/email/stream")
 async def check_email_stream(body: EmailRequest):
     if not body.headers.strip() and not body.body.strip():
         raise HTTPException(400, "Provide email headers, body, or both.")
-    return StreamingResponse(streaming.stream_email(body.headers, body.body), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+    async def gen():
+        async for chunk in streaming.stream_email(body.headers, body.body):
+            yield chunk
+        result = email_analyzer.analyze_email(body.headers, body.body)
+        _record_event("email", result["verdict"], result["risk_score"],
+                      domain=result.get("from_domain") or None,
+                      codes=[f["code"] for f in result["findings"]])
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/file/stream")
@@ -194,7 +268,15 @@ async def audit_stream(body: WebAuditRequest):
 async def check_message_stream(body: MessageRequest):
     if not body.text.strip():
         raise HTTPException(400, "Paste a message to check.")
-    return StreamingResponse(streaming.stream_message(body.text), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+    async def gen():
+        async for chunk in streaming.stream_message(body.text):
+            yield chunk
+        result = message_analyzer.analyze_message(body.text)
+        _record_event("message", result["verdict"], result["risk_score"],
+                      codes=[f["code"] for f in result["findings"]])
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/domain/stream")
@@ -209,6 +291,81 @@ async def check_tls_stream(body: TlsRequest):
     if not is_valid_host(host):
         raise HTTPException(400, f"'{host or body.host}' is not a valid domain name or IP address.")
     return StreamingResponse(streaming.stream_tls(host), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+# ── Public trends ────────────────────────────────────────────────────
+# What the platform's own checks are seeing right now: which brands are
+# being impersonated, which scam patterns repeat, which flagged domains
+# keep coming back. Built only from ScanEvent aggregates (see models) —
+# no submitted links, messages or addresses are ever exposed here.
+
+public_router = APIRouter(tags=["public"])
+
+_PATTERN_LABELS = {
+    "brand-in-host": "Fake brand login pages",
+    "typosquat": "Typosquatted look-alike domains",
+    "credential-bait": "Messages asking for passwords / OTPs",
+    "urgency-pressure": "Urgency pressure tactics",
+    "bec-wire": "Payment-diversion (BEC) language",
+    "giftcard-scam": "Gift-card / crypto payment demands",
+    "ip-host": "Pages hosted on raw IP addresses",
+    "obfuscated-ip": "Disguised IP addresses",
+    "tracking-pixel": "Email open-tracking beacons",
+    "hidden-text": "Hidden text to fool spam filters",
+    "reply-to-mismatch": "Reply-To hijacking",
+    "spf-fail": "Forged sender authentication (SPF)",
+    "dkim-fail": "Forged sender authentication (DKIM)",
+    "dmarc-fail": "Forged sender authentication (DMARC)",
+    "executable-download": "Program downloads sent as links",
+    "shortener": "Shortened links hiding destinations",
+    "tracking-wrapper": "Tracking redirect wrappers",
+    "tracking-params": "Click-tracking parameters (utm / click IDs)",
+    "wrapped-destination": "Destinations hidden inside wrapper links",
+    "punycode": "Punycode look-alike domains",
+}
+
+
+def _as_utc(ts: datetime | None) -> datetime | None:
+    # SQLite returns offset-naive datetimes even for timezone-aware
+    # columns; stored values are UTC by construction (models._now).
+    if ts is not None and ts.tzinfo is None:
+        return ts.replace(tzinfo=UTC)
+    return ts
+
+
+@public_router.get("/api/public/trending")
+async def trending(db: Session = Depends(get_db)):
+    now = datetime.now(UTC)
+    since = now - timedelta(days=30)
+    rows = [r for r in db.query(ScanEvent).all() if (_as_utc(r.created_at) or now) >= since]
+    total = len(rows)
+    flagged_rows = [r for r in rows if r.verdict in _FLAGGED]
+    brands = Counter(r.brand for r in rows if r.brand)
+    domains = Counter(r.domain for r in flagged_rows if r.domain)
+    patterns = Counter()
+    for r in rows:
+        for code in (r.finding_codes or "").split(","):
+            if code and code != "clean":
+                patterns[code] += 1
+    last7 = sum(1 for r in rows if (_as_utc(r.created_at) or now) >= now - timedelta(days=7))
+    return {
+        "window_days": 30,
+        "total_scans": total,
+        "flagged": len(flagged_rows),
+        "flagged_pct": round(100 * len(flagged_rows) / total, 1) if total else 0.0,
+        "scans_last_7_days": last7,
+        "top_impersonated_brands": [
+            {"name": name, "count": count} for name, count in brands.most_common(5)
+        ],
+        "top_flagged_domains": [
+            {"domain": domain, "count": count}
+            for domain, count in domains.most_common(10) if count >= 2
+        ][:5],
+        "top_patterns": [
+            {"code": code, "label": _PATTERN_LABELS.get(code, code.replace("-", " ").capitalize()), "count": count}
+            for code, count in patterns.most_common(5)
+        ],
+    }
 
 
 @router.get("/history")

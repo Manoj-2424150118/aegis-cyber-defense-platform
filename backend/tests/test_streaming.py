@@ -32,7 +32,7 @@ def test_url_stream_order_and_parity(client):
     events = _events(r)
     assert events[0]["type"] == "start"
     steps = [e for e in events if e["type"] == "step"]
-    assert [s["index"] for s in steps] == [1, 2, 3, 4, 5]
+    assert [s["index"] for s in steps] == [1, 2, 3, 4, 5, 6]
     assert events[-1]["type"] == "result"
     result = events[-1]["result"]
     assert result["risk_score"] == classic["risk_score"] == 85
@@ -47,7 +47,7 @@ def test_email_stream_parity(client):
     classic = client.post("/api/tools/email", json=payload).json()
     events = _events(client.post("/api/tools/email/stream", json=payload))
     steps = [e for e in events if e["type"] == "step"]
-    assert len(steps) == 4
+    assert len(steps) == 5
     assert events[-1]["result"]["risk_score"] == classic["risk_score"]
     assert events[-1]["result"]["verdict"] == classic["verdict"]
 

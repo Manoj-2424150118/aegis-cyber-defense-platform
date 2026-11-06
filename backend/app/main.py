@@ -63,6 +63,8 @@ THREAT_MODEL = [
     {"threat": "Domain spoofing (no SPF/DMARC)", "module": "Domain Security Checker", "endpoint": "POST /api/tools/domain"},
     {"threat": "Expired / mismatched TLS certificates", "module": "TLS Certificate Inspector", "endpoint": "POST /api/tools/tls"},
     {"threat": "Brute force against Aegis itself", "module": "Argon2id + lockout + rate limiting", "endpoint": "/api/auth/*"},
+    {"threat": "Click tracking & hidden redirect chains", "module": "Tracker Detection + Redirect Tracer", "endpoint": "POST /api/tools/url/resolve"},
+    {"threat": "Email open-tracking & hidden filter-evasion text", "module": "Email Analyser (tracking stage)", "endpoint": "POST /api/tools/email"},
 ]
 
 
@@ -74,7 +76,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.6.0",
+    version="1.7.0",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
 )
@@ -100,12 +102,13 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(tools.router)
+app.include_router(tools.public_router)
 app.include_router(vault_router.router)
 
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.6.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.7.0"}
 
 
 @app.get("/api", tags=["ops"])

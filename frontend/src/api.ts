@@ -230,9 +230,34 @@ async function post<T>(path: string, body: unknown, token?: string, retryColdSta
   return (await res.json()) as T;
 }
 
+export interface UrlResult {
+  risk_score: number; verdict: string; findings: Finding[];
+  trackers?: { type: string; name: string }[]; cleaned_url?: string | null;
+}
+export interface RedirectTrace {
+  url: string; final_url: string; hops: number; crossed_domains: boolean;
+  reachable: boolean; error: string | null;
+  chain: { url: string; status: number }[];
+  final_risk_score: number; final_verdict: string; final_findings: Finding[];
+}
+export interface Trending {
+  window_days: number; total_scans: number; flagged: number; flagged_pct: number;
+  scans_last_7_days: number;
+  top_impersonated_brands: { name: string; count: number }[];
+  top_flagged_domains: { domain: string; count: number }[];
+  top_patterns: { code: string; label: string; count: number }[];
+}
+
 export const api = {
   checkUrl: (url: string) =>
-    post<{ risk_score: number; verdict: string; findings: Finding[] }>("/api/tools/url", { url }),
+    post<UrlResult>("/api/tools/url", { url }),
+  resolveUrl: (url: string) =>
+    post<RedirectTrace>("/api/tools/url/resolve", { url }),
+  getTrending: async (): Promise<Trending> => {
+    const res = await fetchWithTimeout(`${BASE}/api/public/trending`, {}, { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart: true });
+    if (!res.ok) throw new Error(`Trending failed (${res.status})`);
+    return (await res.json()) as Trending;
+  },
   assessPassword: (password: string) =>
     post<{ score: number; label: string; entropy_bits: number; estimated_crack_time_offline: string; issues: string[] }>(
       "/api/tools/password/assess",
@@ -275,7 +300,7 @@ export const api = {
   },
   // ── Live-streamed variants (agent view) ──
   checkUrlStream: (url: string, h?: StreamHandlers) =>
-    streamPost<{ risk_score: number; verdict: string; findings: Finding[] }>("/api/tools/url/stream", { url }, h),
+    streamPost<UrlResult>("/api/tools/url/stream", { url }, h),
   checkEmailStream: (headers: string, body: string, h?: StreamHandlers) =>
     streamPost<{ risk_score: number; verdict: string; findings: Finding[] }>("/api/tools/email/stream", { headers, body }, h),
   passwordStream: (password: string, h?: StreamHandlers) =>

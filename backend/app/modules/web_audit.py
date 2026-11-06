@@ -141,7 +141,7 @@ def _fetch_guarded(url: str, timeout: float = 8.0):
     # receives — while still honestly naming the scanner.
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; Aegis-Security-Audit/1.6; +https://aegis-cyber-defense-platform.onrender.com)"},
+        headers={"User-Agent": "Mozilla/5.0 (compatible; Aegis-Security-Audit/1.7; +https://aegis-cyber-defense-platform.onrender.com)"},
         method="GET",
     )
     ctx = ssl.create_default_context()

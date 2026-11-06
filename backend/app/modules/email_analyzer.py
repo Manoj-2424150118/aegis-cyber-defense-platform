@@ -110,11 +110,55 @@ def _stage_links(ctx: _EmailContext) -> None:
         ctx.add(12, "suspicious-link", "The email contains a link the URL analyser rates as suspicious.")
 
 
+# Domains whose only product is knowing when/where an email was opened.
+OPEN_TRACKERS = {
+    "mailtrack.io", "mltrk.io", "t.mailtrack.io", "sendgrid.net",
+    "mailchimp.com", "list-manage.com", "customer.io", "iterable.com",
+    "klaviyomail.com", "hubspotlinks.com", "hs-sales-engage.com",
+    "streak.com", "yesware.com", "mixmax.com", "mailgun.net", "mg.mp",
+    "postmarkapp.com", "sparkpostmail.com", "mandrillapp.com",
+}
+
+
+def _stage_tracking(ctx: _EmailContext) -> None:
+    """Tracking pixels & hidden text — the surveillance layer of email.
+
+    A 1x1 (or invisible) remote image tells the sender the moment the
+    mail is opened, from which network — legitimate marketing does
+    this too, which is exactly why phishers hide behind it. Text
+    concealed with display:none / zero size / matched colours is worse:
+    it stuffs keywords past spam filters that the victim never sees.
+    """
+    body = ctx.body
+    pixels = 0
+    tracker_hosts: set[str] = set()
+    for tag in re.findall(r"<img\b[^>]*>", body, re.I):
+        src = re.search(r'src="([^"]+)"', tag, re.I)
+        tiny = re.search(r'(width|height)\s*=\s*"?[01]\b', tag, re.I) or re.search(
+            r"style=\"[^\"]*(width:\s*[01]px|height:\s*[01]px|display:\s*none|visibility:\s*hidden)", tag, re.I)
+        host = urlparse(src.group(1)).hostname if src else None
+        if host and host.lower() in OPEN_TRACKERS:
+            tracker_hosts.add(host.lower())
+        if tiny and src:
+            pixels += 1
+    if tracker_hosts:
+        ctx.add(10, "tracking-pixel", f"Email embeds an open-tracking beacon ({', '.join(sorted(tracker_hosts))}) — opening it reports your time, device and approximate location to the sender.")
+    elif pixels:
+        ctx.add(10, "tracking-pixel", f"Email embeds {pixels} invisible tracking image(s) — opening it silently notifies the sender that you read it, and when.")
+    hidden = re.findall(
+        r"<(?:div|span|p|td)\b[^>]*style=\"[^\"]*(display:\s*none|visibility:\s*hidden|font-size:\s*0|opacity:\s*0)[^\"]*\"[^>]*>([^<]{20,})<",
+        body, re.I)
+    if hidden:
+        sample = re.sub(r"\s+", " ", hidden[0][1]).strip()[:80]
+        ctx.add(15, "hidden-text", f"Email hides text from you that filters can see ('{sample}…') — a spam-filter evasion trick common in phishing.")
+
+
 EMAIL_STAGES = [
     ("Verifying sender authentication — SPF · DKIM · DMARC", _stage_auth),
     ("Sender consistency — Reply-To · Return-Path · display name", _stage_sender),
     ("Social-engineering scan — urgency & credential bait", _stage_content),
     ("Link analysis — destinations re-scored by the URL engine", _stage_links),
+    ("Tracking & hidden content — pixels, beacons, concealed text", _stage_tracking),
 ]
 
 

@@ -39,6 +39,11 @@ FIXES: dict[str, str] = {
     "executable-download": "This link downloads a program. Only ever install software from the vendor's official site or your OS app store — never from a message link.",
     "archive-download": "This link downloads an archive — a common malware wrapper. If you didn't explicitly request it, delete it unopened; if you did, scan the contents with this platform's File Scanner before extracting.",
     "redirect-param": "The link routes through a redirect parameter, so the page you see first is not the final destination. Verify the final domain before entering anything.",
+    "tracking-params": "Use the cleaned link provided in the report — it opens the same page without reporting your click. For links you share onward, strip everything after '?' that starts with utm_ or looks like fbclid/gclid.",
+    "tracking-wrapper": "Don't judge the link by the wrapper's name. Use the redirect tracer in this tool to see the final destination, and only proceed if that domain is the service you expect.",
+    "wrapped-destination": "The real destination is the domain named in the finding — judge that, not the trusted-looking wrapper. If it isn't the official service, do not proceed.",
+    "tracking-pixel": "Block remote images: in Gmail/Outlook turn off automatic image loading, or open mail in plain-text mode. Never 'load images' in a message you are unsure about — that alone confirms your address is live.",
+    "hidden-text": "Hidden text means the sender is performing for filters, not for you. Treat the whole message as hostile: do not click, reply, or download; report it as phishing.",
     "clean": "No action needed. Stay alert: a clean heuristic score is not a guarantee — never enter an OTP you didn't initiate.",
     # ── Email analyser ──────────────────────────────────────────────
     "spf-fail": "The sender failed domain authentication — treat the message as forged. Do not reply, click, or download. Report it as phishing and delete it. If it claims to be your bank/employer, contact them via official channels.",
