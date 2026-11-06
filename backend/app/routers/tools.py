@@ -26,6 +26,7 @@ from app.modules import (
     message_analyzer,
     password_lab,
     redirect_tracer,
+    smart_scan,
     tls_inspector,
     url_analyzer,
     web_audit,
@@ -36,6 +37,7 @@ from app.schemas import (
     GenerateRequest,
     MessageRequest,
     PasswordRequest,
+    SmartScanRequest,
     TlsRequest,
     UrlRequest,
     WebAuditRequest,
@@ -213,6 +215,30 @@ async def check_tls(body: TlsRequest):
     except ValueError as exc:
         # SSRF guard (non-public hosts) — a clean 400, never a 500.
         raise HTTPException(400, str(exc)) from None
+
+
+@router.post("/smart-scan")
+async def smart_scan_endpoint(body: SmartScanRequest):
+    """One box for anything pasted: Smart Scan detects whether the
+    input is a link, an email or a message and runs the matching
+    engine. The aggregate event recorded is the same one the dedicated
+    tool would have recorded, so Trends stays consistent."""
+    if not body.text.strip():
+        raise HTTPException(400, "Paste a link, an email or a message to check.")
+    envelope = smart_scan.smart_scan(body.text)
+    result = envelope["result"]
+    codes = [f["code"] for f in result["findings"]]
+    if envelope["detected_type"] == "url":
+        target = body.text.strip()
+        _record_event("url", result["verdict"], result["risk_score"],
+                      domain=url_analyzer.registrable_domain(target),
+                      brand=url_analyzer.impersonated_brand(target), codes=codes)
+    elif envelope["detected_type"] == "email":
+        _record_event("email", result["verdict"], result["risk_score"],
+                      domain=result.get("from_domain") or None, codes=codes)
+    else:
+        _record_event("message", result["verdict"], result["risk_score"], codes=codes)
+    return envelope
 
 
 # ── Live-streamed analysis (Server-Sent Events) ──────────────────────

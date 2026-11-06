@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type Trending } from "./api";
+import { api, type SmartScanResult, type Trending } from "./api";
 import { DomainChecker, EmailAnalyzer, FileScanner, MessageChecker, PasswordLab, TlsInspector, UrlChecker, WebAudit } from "./components/Tools";
 import { VaultPanel } from "./components/VaultPanel";
-import { HERO_SCAN_EVENT } from "./components/Shared";
+import { ErrorNote, FindingsList, ScoreMeter, VerdictBadge } from "./components/Shared";
 
 const COVERAGE = [
   { icon: "🎣", threat: "Phishing links", defense: "URL Analyser", anchor: "tool-url", blurb: "Scores any link for typosquats, IP hosts, shorteners and credential-harvest signals." },
@@ -91,11 +91,7 @@ const FAQS = [
 const REPO = "https://github.com/Manoj-2424150118/aegis-cyber-defense-platform";
 const PHISH_SAMPLE = "http://192.168.10.5/paypal/login/verify";
 const SAFE_SAMPLE = "https://www.google.com";
-
-function dispatchHeroScan(url: string) {
-  window.dispatchEvent(new CustomEvent(HERO_SCAN_EVENT, { detail: url }));
-  document.getElementById("tool-url")?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
+const MSG_SAMPLE = "Dear customer, your bank account will be blocked today. Update your KYC immediately at http://secure-bank-verify.xyz/login to avoid closure.";
 
 function TrendingSection() {
   const [data, setData] = useState<Trending | null>(null);
@@ -142,10 +138,30 @@ function TrendingSection() {
 }
 
 export default function App() {
-  const [heroUrl, setHeroUrl] = useState("");
+  const [heroText, setHeroText] = useState("");
+  const [smart, setSmart] = useState<SmartScanResult | null>(null);
+  const [smartBusy, setSmartBusy] = useState(false);
+  const [smartError, setSmartError] = useState("");
   const [version, setVersion] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
-  const heroInputRef = useRef<HTMLInputElement>(null);
+  const heroInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Smart Scan: one box for a link, an email or a message — the API
+  // detects which it is and runs the matching checker.
+  const runSmartScan = async (text: string) => {
+    const value = text.trim();
+    if (!value || smartBusy) return;
+    setSmartBusy(true);
+    setSmartError("");
+    setSmart(null);
+    try {
+      setSmart(await api.smartScan(value));
+    } catch (e) {
+      setSmartError(e instanceof Error ? e.message : "The check failed. Please try again.");
+    } finally {
+      setSmartBusy(false);
+    }
+  };
 
   // "/" from anywhere jumps to the hero scan box — the keyboard
   // shortcut every power-user tool (GitHub, CyberChef) trains you on.
@@ -238,21 +254,40 @@ export default function App() {
         </p>
         <form
           className="hero-scan"
-          onSubmit={(e) => { e.preventDefault(); if (heroUrl.trim()) dispatchHeroScan(heroUrl.trim()); }}
+          onSubmit={(e) => { e.preventDefault(); void runSmartScan(heroText); }}
         >
-          <input
+          <textarea
             ref={heroInputRef}
-            value={heroUrl}
-            onChange={(e) => setHeroUrl(e.target.value)}
-            placeholder="Paste a suspicious link — https://…  ( press / )"
-            aria-label="Link to check"
+            value={heroText}
+            onChange={(e) => setHeroText(e.target.value)}
+            placeholder="Paste a suspicious link, email or message — we'll work out which it is  ( press / )"
+            aria-label="Link, email or message to check"
+            rows={2}
           />
-          <button type="submit">Check it now</button>
+          <button type="submit" disabled={smartBusy}>{smartBusy ? "Checking…" : "Check it now"}</button>
         </form>
+        {smartError && <ErrorNote error={smartError} />}
+        {smart && (
+          <div className="result smart-result" aria-live="polite">
+            <div className="result-head">
+              <span>Detected {smart.detected_label} · checked with the {smart.tool}</span>
+              <VerdictBadge score={smart.risk_score} verdict={smart.verdict} />
+            </div>
+            <ScoreMeter score={smart.risk_score} />
+            <FindingsList findings={smart.result.findings} />
+            {smart.result.cleaned_url && (
+              <p className="smart-note">Tracking-free version of your link: <code>{smart.result.cleaned_url}</code></p>
+            )}
+            {smart.detected_type !== "url" && (smart.result.links_found?.length ?? 0) > 0 && (
+              <p className="smart-note">Links found inside: {smart.result.links_found?.join(", ")}</p>
+            )}
+          </div>
+        )}
         <div className="hero-samples">
           <span>Try:</span>
-          <button type="button" className="sample" onClick={() => { setHeroUrl(PHISH_SAMPLE); dispatchHeroScan(PHISH_SAMPLE); }}>a phishing link</button>
-          <button type="button" className="sample" onClick={() => { setHeroUrl(SAFE_SAMPLE); dispatchHeroScan(SAFE_SAMPLE); }}>a safe link</button>
+          <button type="button" className="sample" onClick={() => { setHeroText(PHISH_SAMPLE); void runSmartScan(PHISH_SAMPLE); }}>a phishing link</button>
+          <button type="button" className="sample" onClick={() => { setHeroText(SAFE_SAMPLE); void runSmartScan(SAFE_SAMPLE); }}>a safe link</button>
+          <button type="button" className="sample" onClick={() => { setHeroText(MSG_SAMPLE); void runSmartScan(MSG_SAMPLE); }}>a scam message</button>
         </div>
         <div className="proof-strip" aria-label="Platform facts">
           {PROOF.map((p) => <span key={p} className="proof-chip">{p}</span>)}

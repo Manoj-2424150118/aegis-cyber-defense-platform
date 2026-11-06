@@ -234,6 +234,18 @@ export interface UrlResult {
   risk_score: number; verdict: string; findings: Finding[];
   trackers?: { type: string; name: string }[]; cleaned_url?: string | null;
 }
+export interface SmartScanResult {
+  detected_type: "url" | "email" | "message";
+  detected_label: string;
+  tool: string;
+  risk_score: number; verdict: string;
+  result: {
+    findings: Finding[];
+    cleaned_url?: string | null;
+    links_found?: string[];
+    [key: string]: unknown;
+  };
+}
 export interface RedirectTrace {
   url: string; final_url: string; hops: number; crossed_domains: boolean;
   reachable: boolean; error: string | null;
@@ -249,6 +261,8 @@ export interface Trending {
 }
 
 export const api = {
+  smartScan: (text: string) =>
+    post<SmartScanResult>("/api/tools/smart-scan", { text }),
   checkUrl: (url: string) =>
     post<UrlResult>("/api/tools/url", { url }),
   resolveUrl: (url: string) =>

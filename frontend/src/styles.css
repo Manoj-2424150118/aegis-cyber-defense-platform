@@ -113,7 +113,11 @@ a { color: var(--accent); }
 .hero-scan:focus-within { border-color: rgba(0, 240, 255, 0.45); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(0, 240, 255, 0.12); }
 .hero-scan input { border: 0; background: transparent; box-shadow: none; font-size: 1rem; }
 .hero-scan input:focus { box-shadow: none; }
+.hero-scan textarea { border: 0; background: transparent; box-shadow: none; font-size: 1rem; flex: 1; resize: vertical; min-height: 2.6rem; font-family: inherit; color: inherit; }
+.hero-scan textarea:focus { box-shadow: none; }
 .hero-scan button { white-space: nowrap; }
+.smart-result { max-width: 660px; margin-left: auto; margin-right: auto; text-align: left; }
+.smart-note { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
 .hero-samples { display: flex; gap: 0.5rem; justify-content: center; align-items: center; margin-top: 0.85rem; flex-wrap: wrap; color: var(--faint); font-size: 0.88rem; }
 .proof-strip { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-top: 1.7rem; }
 .proof-chip {

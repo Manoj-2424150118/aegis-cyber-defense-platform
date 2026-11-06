@@ -54,6 +54,10 @@ Aegis gives a non-technical user one place to check each of these *before* it hu
 | 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (incl. invalid multiple records and ~all softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
 | 9 | Expired / mismatched certificates | **TLS Certificate Inspector** | Real TLS handshake: chain verification, hostname/SAN coverage (with wildcards), expiry runway, protocol version — with an unverified re-handshake to report broken certificates instead of hiding them |
 
+### Smart Scan — one box for everything (v1.8.0)
+
+Visitors rarely know whether the suspicious thing they received is "a URL", "an email" or "a message" — they just have the thing itself. The homepage check box is now **Smart Scan**: paste a link, a full email (headers and all) or a scam SMS/WhatsApp message, and it detects the type, runs the matching engine above and returns one verdict with the same findings — no tool-picking, no sign-up. Also available as `POST /api/tools/smart-scan`.
+
 ## 🏗️ Architecture
 
 ```mermaid
@@ -125,6 +129,7 @@ curl -s -X POST localhost:8000/api/tools/url \
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
+| POST | `/api/tools/smart-scan` | – | Paste anything — link, email or message; detects the type and runs the matching checker |
 | POST | `/api/tools/url` | – | Phishing URL analysis + tracker detection & cleaned link |
 | POST | `/api/tools/url/resolve` | – | Redirect-chain trace to the real destination (SSRF-guarded) |
 | POST | `/api/tools/email` | – | Phishing email analysis + tracking-pixel & hidden-text detection |
@@ -145,7 +150,7 @@ Full interactive reference at `/docs` when the API is running.
 ## 🧪 Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 136 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf, trackers, redirect tracer, trends
+cd backend && pytest -q --cov=app     # 161 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf, trackers, redirect tracer, trends, smart scan
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
@@ -174,7 +179,7 @@ Before the v1.1 deployment the platform went through a dedicated security review
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 136 pytest tests
+│   ├── tests/                 # 161 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module

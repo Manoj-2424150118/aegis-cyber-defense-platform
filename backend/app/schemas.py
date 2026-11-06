@@ -61,6 +61,15 @@ class MessageRequest(BaseModel):
     text: str = Field(min_length=1, max_length=20000)
 
 
+class SmartScanRequest(BaseModel):
+    """One pasted blob — a link, an email or a message. Smart Scan
+    classifies it and routes it to the matching engine, so no
+    whitespace rejection here: emails and messages legitimately
+    contain spaces and newlines."""
+
+    text: str = Field(min_length=3, max_length=20000)
+
+
 class DomainRequest(BaseModel):
     domain: str = Field(min_length=3, max_length=253)
 
