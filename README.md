@@ -174,7 +174,7 @@ Before the v1.1 deployment the platform went through a dedicated security review
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 123 pytest tests
+│   ├── tests/                 # 136 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 18 + TypeScript + Vite
 │   ├── src/components/        # one component per protection module
