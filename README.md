@@ -3,111 +3,129 @@
 [![CI](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform/actions/workflows/codeql.yml/badge.svg)](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform/actions/workflows/codeql.yml)
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 [![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Try_Aegis_online-46E3B7?style=for-the-badge)](https://aegis-cyber-defense-platform.onrender.com)
 
-### ▶️ **Live demo: [aegis-cyber-defense-platform.onrender.com](https://aegis-cyber-defense-platform.onrender.com)** — no sign-up needed to check a link, email, file or password. *(Free-tier hosting: the first load after idle can take ~1 minute while the service wakes up.)*
+### ▶️ Live demo: [aegis-cyber-defense-platform.onrender.com](https://aegis-cyber-defense-platform.onrender.com) — no sign-up needed to check a link, email, file or password. *(Free-tier hosting: the first load after idle can take ~1 minute while the service wakes up.)*
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Manoj-2424150118/aegis-cyber-defense-platform) — one-click deploy of your own instance (free tier, uses this repo's `render.yaml` Blueprint).
 
-> **One platform that protects an individual user against today's most common cyber threats** — phishing links, phishing/BEC email, malware attachments, weak and breached passwords, stolen secrets, and unsafe websites — built as a production-grade full-stack application with defence-in-depth applied to itself.
+**Repository:** [github.com/Manoj-2424150118/aegis-cyber-defense-platform](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform)
+
+---
+
+## Overview
+
+Most people are not compromised by nation-state zero-days. They are compromised by a phishing link in an SMS, a fake "verify your account" email, a malware attachment disguised as an invoice, a weak or reused password, secrets stored in plaintext notes, or card details typed into an unsafe website.
+
+**Aegis is one platform that checks each of these *before* it hurts the user** — and practises what it preaches: the platform itself is hardened against the OWASP Top 10, with Argon2id authentication, an AES-256-GCM encrypted vault, SSRF-guarded fetching, rate limiting and strict security headers.
+
+The homepage check is **Smart Scan** (v1.8.0): paste a link, a full email (headers and all) or a scam SMS/WhatsApp message, and Aegis detects the type, runs the matching engine and returns one verdict with explained findings — no tool-picking, no sign-up. Every analysis can also be watched live: findings stream stage-by-stage over Server-Sent Events in a terminal-style **Agent View**, and the streamed result is byte-for-byte the classic API result (parity is enforced by tests). Every finding in every report ships a concrete **Suggested fix**, written for the person holding the report.
 
 Built by [Manoj Kumar Sharma](https://github.com/Manoj-2424150118) — Cybersecurity & Software Professional (MCA, Manipal University Jaipur).
 
 ---
 
-## 🚨 The problem
+## The nine protection tools
 
-Most people don't get hacked by nation-state zero-days. They get hacked by:
-
-1. A **phishing link** in an SMS or WhatsApp message
-2. A **fake email** asking them to "verify" their account
-3. A **malware attachment** disguised as an invoice (`invoice.pdf.exe`)
-4. A **weak or reused password** that leaked in someone else's data breach
-5. Storing PINs and recovery codes in **plaintext notes**
-6. Typing card details into a **site with no real security controls**
-
-Aegis gives a non-technical user one place to check each of these *before* it hurts them — and it practises what it preaches: the platform itself is hardened against the OWASP Top 10.
-
-**Live Agent View (v1.2):** every analysis is streamed to the browser stage-by-stage over Server-Sent Events — you watch the agent parse, verify authentication, hunt indicators and score risk *as each check actually executes*, with the findings and running score landing live in a terminal-style console. No black box, no spinner theatre: the streamed result is byte-for-byte the classic API result (parity is enforced by tests).
-
-**Suggested fixes (v1.3):** every finding in every report ships a concrete **Suggested fix** — what to do, step by step, written for the person holding the report (end users for links/emails/files; site owners for audits, down to the exact config flag). A report should end the problem, not just name it. A test enforces that no finding can ship without one. Detection coverage also expanded: dangerous `javascript:`/`data:` schemes, numeric/hex/octal-obfuscated IPs, executable & archive downloads, open-redirect parameters, BEC wire-fraud and gift-card language, mshta/rundll32/AMSI-bypass/credential-theft indicators, the EICAR test file, and X-Powered-By / CORS-wildcard / cache-control audit checks.
-
-**License:** MIT — free for everyone, forever. Use it, fork it, modify it, self-host it. See `LICENSE` and `CONTRIBUTING.md`.
-
-## ✨ The nine protection modules
-
-| # | Threat (real-world attack) | Module | What it detects / does |
+| # | Threat | Tool | What it detects / does |
 |---|---|---|---|
-| 1 | Phishing & fake login pages | **URL Analyser** | IP-literal hosts, punycode/homograph domains, typosquatting (edit-distance vs 22 brands incl. Indian banks & UPI), brand-in-host/path tricks, shorteners, `@` userinfo tricks, suspicious TLDs, DGA-like entropy, credential keywords — as explained, weighted findings |
-| 2 | Phishing & Business Email Compromise | **Email Analyser** | SPF/DKIM/DMARC failures, Reply-To & Return-Path mismatches, display-name spoofing, freemail impersonation, urgency/pressure language, credential bait, link-text vs destination mismatch, and it re-scores every link with Module 1 |
-| 3 | Malware & ransomware attachments | **File Scanner** | Magic-byte type spoofing, double extensions, dangerous types, Shannon entropy (packers), embedded droppers (PowerShell `-enc`, certutil, curl\|sh), macro auto-exec, base64-embedded PEs, zip bombs, executables hidden in archives. In-memory only — **files are never executed or written to disk** |
-| 4 | Weak / reused passwords | **Password Lab** | Entropy & offline crack-time estimate, common-password detection, plus a **secure generator** (`secrets` module) and diceware-style passphrases |
-| 5 | Credential stuffing after breaches | **Breach Check** | Have-I-Been-Pwned **k-anonymity** range API — only 5 hex chars of the SHA-1 hash ever leave the machine; offline fallback list when the network is down |
-| 6 | Theft of stored secrets | **Encrypted Vault** | **AES-256-GCM** authenticated encryption, key derived from the user's master password with **Argon2id**. The server stores ciphertext only — a database leak reveals nothing. Tampering and wrong passwords are detected by the GCM tag |
-| + | MITM & unsafe websites | **Website Audit** | Grades any site A–F on HTTPS/HSTS, CSP, X-Frame-Options, MIME-sniffing, Referrer/Permissions policy and cookie flags (Secure/HttpOnly/SameSite) |
-| 7 | Scam SMS / WhatsApp messages | **Scam Message Checker** | Digital-arrest & agency impersonation, KYC/account-block threats, OTP/PIN harvesting, UPI payment redirection, Telegram task scams, prize/cashback bait, crypto-doubling — and it extracts and re-scores every link in the message with Module 1 |
-| 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (incl. invalid multiple records and ~all softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
+| 1 | Phishing & fake login pages | **URL Analyser** | IP-literal hosts, punycode/homograph domains, typosquatting (edit-distance vs 22 brands incl. Indian banks & UPI), brand-in-host/path tricks, shorteners, `@` userinfo tricks, suspicious TLDs, DGA-like entropy, credential keywords — plus tracker detection with a cleaned link, and an SSRF-guarded redirect tracer |
+| 2 | Phishing & Business Email Compromise | **Email Analyser** | SPF/DKIM/DMARC failures, Reply-To & Return-Path mismatches, display-name spoofing, freemail impersonation, urgency/pressure language, credential bait, link-text vs destination mismatch, tracking pixels and hidden text — and it re-scores every link with the URL Analyser |
+| 3 | Malware & ransomware attachments | **File Scanner** | Magic-byte type spoofing, double extensions, dangerous types, Shannon entropy (packers), embedded droppers (PowerShell `-enc`, certutil, `curl \| sh`), macro auto-exec, base64-embedded PEs, zip bombs, executables hidden in archives. In-memory only — **files are never executed or written to disk** |
+| 4 | Weak / reused / breached passwords | **Password Lab** | Entropy & offline crack-time estimate, common-password detection, a secure generator (`secrets` module) and diceware-style passphrases — plus a breach check via the Have-I-Been-Pwned **k-anonymity** range API: only 5 hex chars of the SHA-1 hash ever leave the machine, with an offline fallback list when the network is down |
+| 5 | Theft of stored secrets | **Encrypted Vault** | **AES-256-GCM** authenticated encryption; the key is derived from the user's master password with **Argon2id**. The server stores ciphertext only — a database leak reveals nothing; tampering and wrong passwords are detected by the GCM tag |
+| 6 | Scam SMS / WhatsApp messages | **Scam Message Checker** | Digital-arrest & agency impersonation, KYC/account-block threats, OTP/PIN harvesting, UPI payment redirection, Telegram task scams, prize/cashback bait, crypto-doubling — and it extracts and re-scores every link in the message |
+| 7 | MITM & unsafe websites | **Website Audit** | Grades any site A–F on HTTPS/HSTS, CSP, X-Frame-Options, MIME-sniffing, Referrer/Permissions policy and cookie flags (Secure/HttpOnly/SameSite) |
+| 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (including invalid multiple records and `~all` softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
 | 9 | Expired / mismatched certificates | **TLS Certificate Inspector** | Real TLS handshake: chain verification, hostname/SAN coverage (with wildcards), expiry runway, protocol version — with an unverified re-handshake to report broken certificates instead of hiding them |
 
-### Smart Scan — one box for everything (v1.8.0)
+**Smart Scan** (`POST /api/tools/smart-scan`) sits above all nine: it classifies pasted content and routes it to the right engine.
 
-Visitors rarely know whether the suspicious thing they received is "a URL", "an email" or "a message" — they just have the thing itself. The homepage check box is now **Smart Scan**: paste a link, a full email (headers and all) or a scam SMS/WhatsApp message, and it detects the type, runs the matching engine above and returns one verdict with the same findings — no tool-picking, no sign-up. Also available as `POST /api/tools/smart-scan`.
+---
 
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-    U[User Browser] -->|HTTPS, strict CSP| N[nginx — React SPA<br/>security headers, /api proxy]
-    N -->|REST + JWT| F[FastAPI API<br/>rate limit · security headers · CORS allowlist]
-    F --> A[Auth<br/>Argon2id · lockout · JWT]
-    F --> M1[URL Analyser]
-    F --> M2[Email Analyser]
-    F --> M3[File Scanner<br/>in-memory, sandboxed]
-    F --> M4[Password Lab]
-    F --> M5[Breach Check<br/>k-anonymity → HIBP]
-    F --> M6[Vault Crypto<br/>AES-256-GCM · Argon2id KDF]
-    F --> W[Website Audit<br/>TLS + headers]
-    A --> DB[(SQLite / PostgreSQL<br/>SQLAlchemy 2.0)]
-    M6 --> DB
+    U[User Browser] -->|HTTPS · strict CSP| N[React 19 + TypeScript SPA<br/>nginx in Compose mode<br/>or FastAPI-served static in single-service mode]
+    N -->|REST + JWT · SSE streams| F[FastAPI API<br/>security headers · rate limiting<br/>CORS allowlist · request IDs]
+    F --> R1[Tools router]
+    F --> R2[Auth router<br/>Argon2id · lockout · JWT]
+    F --> R3[Vault router<br/>per-user scoping]
+    F --> R4[Public router<br/>trending aggregates]
+    R1 --> M[Detection engines — pure functions<br/>url · email · file · password · message<br/>web audit · domain · TLS · redirect · smart scan]
+    R3 --> V[Vault crypto<br/>AES-256-GCM · Argon2id KDF]
+    M -->|k-anonymity range query| H[(Have I Been Pwned)]
+    M -->|live DNS lookups| D[(Public DNS)]
+    M -->|SSRF-guarded fetch · redirect re-validation| T[(Target websites)]
+    R2 --> DB[(SQLite default · PostgreSQL via SQLAlchemy 2.0)]
+    V --> DB
 ```
 
-Design principles: **pure, testable detection engines** (no I/O inside modules except the two documented network clients), thin routers, validated inputs everywhere, and configuration only from the environment.
+Design principles:
 
-## 🔐 How Aegis secures itself (OWASP Top 10)
+- **Pure, testable detection engines** — the modules take values and return values (no DB, no globals); the only network clients are the documented HIBP, DNS, TLS and guarded-fetch paths.
+- **Explainability over black-box scoring** — every point in a risk score is a named finding with a human message and a suggested fix.
+- **Zero-knowledge vault** — the master password never reaches the database; only `base64(salt ‖ nonce ‖ ciphertext)` is stored.
+- **Defence in depth for the platform itself** — see the threat model below and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-| Risk | Control in this codebase |
+---
+
+## Threat model
+
+| Assets | Adversaries | Mitigations |
+|---|---|---|
+| Vault secrets at rest | Attacker who obtains the database or a backup | AES-256-GCM authenticated encryption; key derived per item from the master password via Argon2id with a random salt; server stores ciphertext only |
+| Account credentials & sessions | Credential stuffers, brute-forcers, token thieves | Argon2id password hashing; account lockout (5 failures → 15 min); stricter rate limits on `/api/auth`; short-lived access tokens; generic auth errors (no user enumeration); 12-character minimum passwords |
+| Passwords submitted for breach checking | Network observers, the platform itself | HIBP k-anonymity — only the first 5 hex characters of the SHA-1 hash are transmitted; the full password/hash never leaves the client machine |
+| Files submitted for scanning | Malicious uploaders, zip bombs, weaponised attachments | Static analysis in memory only — files are never executed or written to disk; 10 MB capped-chunk upload limit; archive expansion ratio/total caps; magic-byte vs extension checks |
+| Platform availability & integrity | Abusive clients, fuzzers, injection attackers | Sliding-window rate limiting; Pydantic validation of every request body; SQLAlchemy parameterised queries; strict security-headers middleware + nginx CSP; global error handler returns generic errors with a request ID, never stack traces |
+| Third-party systems reachable from the server | Users abusing the audit/tracer tools as an SSRF springboard | Fetcher resolves targets and refuses loopback/private/link-local/reserved addresses; every redirect hop is re-validated; only `http`/`https` schemes with timeouts — cloud metadata endpoints are unreachable through Aegis |
+| Scan-history privacy | Other users, data aggregators | Vault and history rows are scoped per user on every query; the public trending endpoint exposes only privacy-safe aggregate counts, never submitted content |
+
+Explicitly out of scope: endpoint compromise of the user's own device, and detection guarantees — static/heuristic analysis is a first line of defence, not a guarantee (see *Honest limitations*).
+
+---
+
+## Tech stack
+
+| Layer | Technology |
 |---|---|
-| Broken access control | JWT auth on all vault routes; per-user row scoping on every query |
-| Cryptographic failures | Argon2id password hashing, AES-256-GCM vault, short-lived access tokens, secrets from env only |
-| Injection | SQLAlchemy parameterised queries; Pydantic validation of every request body |
-| Insecure design | Account lockout (5 failures → 15 min), generic auth errors (no user enumeration) |
-| Security misconfiguration | Strict security-headers middleware + nginx CSP, CORS allowlist, server banner removal |
-| Vulnerable components | Dependabot (pip/npm/actions/docker), Bandit + CodeQL + npm audit in CI |
-| Auth failures | Rate limiting (stricter on `/api/auth`), Argon2id, 12-char minimum passwords |
-| SSRF | Website audit fetches only `http/https`, with timeouts and error containment |
-| Logging/monitoring | Health endpoint, structured CI, scan history per user |
+| Backend | Python 3.12 · FastAPI 0.162 · Pydantic 2 · SQLAlchemy 2.0 |
+| Frontend | React 19 · TypeScript · Vite 8 (served by nginx, or by FastAPI in single-service mode) |
+| Authentication | Argon2id password hashing (`argon2-cffi`) · JWT (`PyJWT`) with lockout + rate limiting |
+| Cryptography | AES-256-GCM vault encryption (`cryptography`) · Argon2id KDF · `secrets`-based password generation |
+| Database | SQLite by default · PostgreSQL via `psycopg` 3 (set `AEGIS_DATABASE_URL`) |
+| External services | Have-I-Been-Pwned range API (k-anonymity) · public DNS (`dnspython`) · live TLS handshakes |
+| Deployment | Docker (multi-stage single-service image) · docker-compose (split frontend/backend) · Render Blueprint (`render.yaml`) |
+| Quality & CI | GitHub Actions — ruff → bandit → pytest + coverage (backend), npm audit → `tsc` → vite build (frontend), docker compose build · CodeQL SAST · Dependabot |
 
-## 🚀 Quick start
+---
+
+## Setup & run
 
 ### Option A — Docker (recommended)
+
 ```bash
 git clone https://github.com/Manoj-2424150118/aegis-cyber-defense-platform.git
 cd aegis-cyber-defense-platform
 docker compose up --build
 ```
+
 - App: http://localhost:8080
 - API docs (Swagger): http://localhost:8000/docs
 
 ### Option B — Local development
+
 ```bash
 # Backend
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 
@@ -117,15 +135,29 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
+### Configuration
+
+All configuration comes from the environment (see `backend/.env.example`):
+
+| Variable | Purpose |
+|---|---|
+| `AEGIS_SECRET_KEY` | JWT signing secret — **must** be overridden in production (a safe default exists only for local demos/tests) |
+| `AEGIS_DATABASE_URL` | Optional PostgreSQL URL (e.g. a hosted Neon/Supabase instance) so accounts survive redeploys; unset = local SQLite |
+| `AEGIS_TRUST_PROXY` | Set `true` only behind a proxy that sets `X-Forwarded-For` (the Render deployment does) |
+| `AEGIS_ENVIRONMENT` | `production` for deployed instances |
+
 ### Try it in 30 seconds
+
 ```bash
 curl -s -X POST localhost:8000/api/tools/url \
   -H 'Content-Type: application/json' \
   -d '{"url":"http://192.168.10.5/paypal/login/verify"}' | python -m json.tool
-# → risk_score 75+, verdict "malicious", with explained findings
+# → high risk score, verdict "malicious", with explained findings
 ```
 
-## 📡 API reference (summary)
+---
+
+## API reference (summary)
 
 | Method | Endpoint | Auth | Purpose |
 |---|---|---|---|
@@ -133,63 +165,78 @@ curl -s -X POST localhost:8000/api/tools/url \
 | POST | `/api/tools/url` | – | Phishing URL analysis + tracker detection & cleaned link |
 | POST | `/api/tools/url/resolve` | – | Redirect-chain trace to the real destination (SSRF-guarded) |
 | POST | `/api/tools/email` | – | Phishing email analysis + tracking-pixel & hidden-text detection |
-| GET | `/api/public/trending` | – | Live scam trends from privacy-safe scan aggregates |
-| POST | `/api/tools/file` | – | Malware static scan (multipart, ≤10 MB) |
-| POST | `/api/tools/password/assess` | – | Strength, entropy, crack time |
+| POST | `/api/tools/file` | – | Malware static scan (multipart, ≤ 10 MB) |
+| POST | `/api/tools/password/assess` | – | Strength, entropy, crack-time estimate |
 | POST | `/api/tools/password/breach` | – | k-anonymity breach lookup |
-| POST | `/api/tools/password/generate` | – | Secure password + passphrase |
+| POST | `/api/tools/password/generate` | – | Secure password + passphrase generation |
 | POST | `/api/tools/web-audit` | – | Website security grade |
 | POST | `/api/tools/message` | – | Scam SMS/WhatsApp message analysis |
 | POST | `/api/tools/domain` | – | Domain SPF/DMARC/CAA security grade |
 | POST | `/api/tools/tls` | – | TLS certificate inspection |
+| GET | `/api/public/trending` | – | Scam trends from privacy-safe scan aggregates |
 | POST | `/api/auth/register` · `/login` · `/refresh` | – | Argon2id + JWT auth with lockout |
 | GET/POST/DELETE | `/api/vault` | JWT | Encrypted vault CRUD |
 
-Full interactive reference at `/docs` when the API is running.
+Every tool also has a `/stream` variant that returns the same result over Server-Sent Events for the live Agent View. Full interactive reference at `/docs` when the API is running.
 
-## 🧪 Testing & quality
+---
+
+## Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 161 tests: engines, crypto, API, lockout, headers, streaming parity, remediation, validation, perf, trackers, redirect tracer, trends, smart scan
+cd backend && pytest -q --cov=app     # 161 tests: engines, crypto, API, lockout, headers,
+                                       # streaming parity, remediation, validation,
+                                       # trackers, redirect tracer, trends, smart scan
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
-CI (GitHub Actions) runs on every push/PR: **ruff → bandit → pytest+cov** (backend), **npm audit → tsc → vite build** (frontend), **docker compose build**, plus **CodeQL** SAST and weekly **Dependabot** updates.
+CI runs on every push/PR: **ruff → bandit → pytest + coverage** (backend), **npm audit → tsc → vite build** (frontend), **docker compose build**, plus **CodeQL** SAST and weekly **Dependabot** updates.
 
-### Hardening & QA (v1.1)
-Before the v1.1 deployment the platform went through a dedicated security review and an isolated-sandbox QA battery (`scripts/qa_battery.py`: functional checks, an attack suite — SSRF, SQLi, forged JWT, oversized uploads, brute force — 46 fuzz payloads, and a 100-request deterministic load loop). Findings were fixed and locked in as regression tests (`backend/tests/test_security.py`):
+The platform has also been through a dedicated hardening pass and an isolated-sandbox QA battery (`scripts/qa_battery.py`: functional checks, an attack suite — SSRF, SQLi, forged JWT, oversized uploads, brute force — 46 fuzz payloads, and a 100-request deterministic load loop). Findings were fixed and locked in as regression tests (`backend/tests/test_security.py`). Full results: [docs/QA_REPORT.md](docs/QA_REPORT.md).
 
-- **SSRF**: the website-audit fetcher now resolves targets and refuses loopback/private/link-local/reserved addresses, and re-validates every redirect hop (cloud-metadata endpoints are unreachable through it)
-- **Upload DoS**: uploads are read in capped chunks — an oversized file is rejected at the limit, never buffered whole in memory
-- **Auth**: timing-equalised login errors (no user enumeration), registration rejects common/repetitive passwords, per-IP rate limits key correctly behind the hosting proxy, `/health` exempt
-- **Crash-proofing**: malformed URLs (`javascript:…`, non-numeric ports) can no longer produce a 500; a global handler returns generic errors with a request ID, never a stack trace
-- **Dependencies**: all backend and frontend packages upgraded to current versions — `pip-audit` reports **no known vulnerabilities**
-- Full results: [docs/QA_REPORT.md](docs/QA_REPORT.md)
+---
 
-## 🗂️ Project structure
+## Project structure
 
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── main.py            # FastAPI app, middleware, threat map
+│   │   ├── main.py            # FastAPI app, middleware stack, threat map
 │   │   ├── config.py  db.py  models.py  security.py  deps.py
 │   │   ├── headers.py         # security-headers middleware
 │   │   ├── rate_limit.py      # sliding-window limiter
 │   │   ├── modules/           # pure detection engines
 │   │   │   ├── url_analyzer.py    email_analyzer.py   file_scanner.py
 │   │   │   ├── password_lab.py    web_audit.py        vault.py
+│   │   │   ├── message_analyzer.py  domain_checker.py  tls_inspector.py
+│   │   │   ├── redirect_tracer.py   smart_scan.py      remediation.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
 │   ├── tests/                 # 161 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
-├── frontend/                  # React 18 + TypeScript + Vite
-│   ├── src/components/        # one component per protection module
+├── frontend/                  # React 19 + TypeScript + Vite
+│   ├── src/components/        # one component per protection tool
 │   ├── Dockerfile · nginx.conf (CSP + header hardening)
-├── docs/ARCHITECTURE.md       # threat model, decisions, roadmap detail
-├── docker-compose.yml
+├── docs/ARCHITECTURE.md       # architecture & STRIDE threat model
+├── docs/QA_REPORT.md          # hardening & QA battery results
+├── docker-compose.yml · Dockerfile · render.yaml
 └── .github/                   # CI, CodeQL, Dependabot
 ```
 
-## 🗺️ Roadmap
+---
+
+## Security
+
+**Please report vulnerabilities privately** — via GitHub Security Advisories ("Report a vulnerability" on the Security tab), not a public issue. The full policy, the platform's security design summary and its known limitations are in **[SECURITY.md](SECURITY.md)**.
+
+In short: passwords are hashed with Argon2id; vault items are AES-256-GCM encrypted under an Argon2id-derived key and plaintext secrets are never stored; breach checks use k-anonymity so full passwords never leave the client; uploaded files are analysed in memory only and never executed or persisted; accounts lock after 5 failed logins and auth routes are rate-limited; every response carries a strict set of security headers and CORS is an explicit allowlist.
+
+### Honest limitations
+
+Static/heuristic analysis is a first line of defence, not a guarantee: novel malware can evade signatures, and legitimate marketing links can look suspicious. Aegis always *explains* its findings so the user can judge — and it complements, never replaces, an updated OS, browser and antivirus.
+
+---
+
+## Roadmap
 
 - [ ] Browser extension that checks links in-page with the URL engine
 - [ ] VirusTotal / URLhaus enrichment behind an optional API key
@@ -198,16 +245,12 @@ Before the v1.1 deployment the platform went through a dedicated security review
 - [ ] Passkeys (WebAuthn) login; TOTP 2FA for the vault
 - [ ] Hindi UI localisation for wider adoption in India
 
-## ⚠️ Honest limitations
-
-Static/heuristic analysis is a first line of defence, not a guarantee: novel malware can evade signatures, and legitimate marketing links can look suspicious. Aegis always *explains* its findings so the user can judge — and it complements, never replaces, an updated OS, browser and antivirus. See [SECURITY.md](SECURITY.md).
-
-## 👤 Author
+## Author
 
 **Manoj Kumar Sharma** — Cybersecurity & Software Professional · Jaipur, India
-MCA, Manipal University Jaipur · EC-Council Ethical Hacking Essentials · Google Cybersecurity Professional
+MCA, Manipal University Jaipur · EC-Council Ethical Hacking Essentials · Google Cybersecurity Professional Certificate
 Other work: [Deceptive-Net](https://github.com/Manoj-2424150118/Deceptive-Net-A-Honey-Token-Generative-Framework) (GAN honey-token defence) · [Portfolio](https://manoj-2424150118.github.io)
 
-## 📄 License
+## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Free for everyone: use it, fork it, modify it, self-host it. See also [CONTRIBUTING.md](CONTRIBUTING.md).
