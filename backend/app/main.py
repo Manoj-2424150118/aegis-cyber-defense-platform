@@ -74,11 +74,17 @@ async def lifespan(app: FastAPI):
     yield
 
 
+_PROD = settings.environment == "production"
 app = FastAPI(
     title=settings.app_name,
-    version="1.8.0",
+    version="1.8.1",
     description="One platform that protects an individual user against today's most common cyber threats — phishing, malware, credential theft, weak passwords and unsafe websites.",
     lifespan=lifespan,
+    # The interactive docs and the full OpenAPI map are development aids;
+    # in production they are free reconnaissance, so they are not served.
+    docs_url=None if _PROD else "/docs",
+    redoc_url=None if _PROD else "/redoc",
+    openapi_url=None if _PROD else "/openapi.json",
 )
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -108,14 +114,14 @@ app.include_router(vault_router.router)
 
 @app.get("/health", tags=["ops"])
 def health():
-    return {"status": "ok", "service": "aegis-api", "version": "1.8.0"}
+    return {"status": "ok", "service": "aegis-api", "version": "1.8.1"}
 
 
 @app.get("/api", tags=["ops"])
 def root():
     return {
         "name": settings.app_name,
-        "docs": "/docs",
+        "docs": None if _PROD else "/docs",
         "threat_coverage": THREAT_MODEL,
     }
 

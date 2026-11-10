@@ -327,12 +327,19 @@ def impersonated_brand(raw_url: str) -> str | None:
 
 def registrable_domain(raw_url: str) -> str | None:
     """Last two host labels (paypa1-secure.xyz) — the most that trend
-    statistics may store about a checked link."""
+    statistics may store about a checked link.
+
+    Strict on purpose: only a syntactically valid *domain* qualifies.
+    IP literals, scheme junk (``javascript:…``), fragments and partial
+    quads (``10.5``) return ``None`` — storing them as "domains" would
+    corrupt the public trends feed."""
+    from app.validation import is_valid_domain
+
     url = raw_url.strip()
     if "://" not in url:
         url = "http://" + url
     host = (urlparse(url).hostname or "").lower()
-    if not host:
+    if not host or not is_valid_domain(host):
         return None
     labels = host.split(".")
-    return ".".join(labels[-2:]) if len(labels) >= 2 else host
+    return ".".join(labels[-2:])

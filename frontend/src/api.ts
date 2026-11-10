@@ -346,6 +346,35 @@ export const api = {
     post<{ access_token: string }>("/api/auth/register", { email, password }, undefined, false),
   login: (email: string, password: string) =>
     post<{ access_token: string }>("/api/auth/login", { email, password }, undefined, false),
+  /* Session restore: the refresh token is an HttpOnly cookie (never in
+   * web storage, so XSS cannot read it); this call trades it for a
+   * fresh in-memory access token. The custom header is required by the
+   * server for cookie-based refresh (CSRF defence). */
+  async refresh(): Promise<{ access_token: string }> {
+    const res = await fetchWithTimeout(
+      `${BASE}/api/auth/refresh`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Aegis-Refresh": "1" },
+        body: "{}",
+      },
+      { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart: true },
+    );
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { detail?: unknown };
+      throw new Error(detailToMessage(data.detail, res.status));
+    }
+    return (await res.json()) as { access_token: string };
+  },
+  async logout(): Promise<void> {
+    try {
+      await fetchWithTimeout(
+        `${BASE}/api/auth/logout`,
+        { method: "POST" },
+        { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart: false },
+      );
+    } catch { /* logging out locally matters more than the server round-trip */ }
+  },
   vaultCreate: (token: string, title: string, secret: string, master_password: string) =>
     post<{ id: number; title: string }>("/api/vault", { title, secret, master_password }, token, false),
   async vaultList(token: string) {

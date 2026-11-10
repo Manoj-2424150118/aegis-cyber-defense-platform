@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 
 from app.db import Base, engine
 from app.main import app
-from app.rate_limit import account_limiter, auth_limiter, general_limiter
+from app.rate_limit import account_limiter, auth_limiter, fetch_limiter, general_limiter
+from app.routers import tools as tools_router
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +21,9 @@ def _fresh_state():
     general_limiter.reset()
     auth_limiter.reset()
     account_limiter.reset()
+    fetch_limiter.reset()
+    tools_router._recent_events.clear()
+    tools_router._trending_cache = None
     yield
 
 

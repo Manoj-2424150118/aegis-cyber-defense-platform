@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:8080"]
     rate_limit_per_minute: int = 120
     auth_rate_limit_per_minute: int = 10
+    # Endpoints that make the server fetch/DNS-resolve third-party targets
+    # are far more expensive (and abusable as an anonymous proxy) than a
+    # local analysis, so they get a much tighter per-IP budget.
+    fetch_rate_limit_per_minute: int = 12
+    trending_cache_seconds: int = 60  # public trends are aggregates; serve them stale-tolerant
     trust_proxy: bool = False  # set True only behind a proxy that sets X-Forwarded-For
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MiB
     hibp_api_url: str = "https://api.pwnedpasswords.com/range/"

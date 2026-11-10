@@ -72,5 +72,5 @@ def validate_lookup_host(raw_url: str) -> str | None:
     if not host:
         return "The URL has no host to look up."
     if not is_valid_host(host):
-        return f"'{host}' is not a valid domain name or IP address."
+        return "That doesn't look like a valid domain name or IP address."
     return None

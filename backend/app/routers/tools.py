@@ -6,10 +6,11 @@ logged in, scans are saved to their history for the dashboard.
 """
 
 import logging
+import time as _time
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -31,6 +32,7 @@ from app.modules import (
     url_analyzer,
     web_audit,
 )
+from app.rate_limit import client_ip
 from app.schemas import (
     DomainRequest,
     EmailRequest,
@@ -62,15 +64,46 @@ def _optional_user(db: Session = Depends(get_db)):
 
 _FLAGGED = ("suspicious", "malicious")
 
+# Anti-poisoning burst cap for the public aggregate: repeats of the same
+# scan signature from the same source are genuine signal (several people
+# checking the same phish), so the first few count — but one source
+# bulk-submitting one payload cannot inflate the public counts or push a
+# fabricated domain into "top flagged". The source key is used only for
+# this in-memory cap and is never stored (telemetry keeps no IPs).
+_EVENT_BURST_WINDOW = 60
+_EVENT_BURST_MAX = 3
+_recent_events: dict[tuple, tuple[float, int]] = {}
+
+
+def _over_burst_cap(key: tuple) -> bool:
+    now = _time.monotonic()
+    if len(_recent_events) > 4096:  # bound memory; stale entries are useless anyway
+        _recent_events.clear()
+    start, count = _recent_events.get(key, (now, 0))
+    if now - start >= _EVENT_BURST_WINDOW:
+        start, count = now, 0
+    count += 1
+    _recent_events[key] = (start, count)
+    return count > _EVENT_BURST_MAX
+
 
 def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | None = None,
-                  brand: str | None = None, codes: tuple[str, ...] | list[str] = ()) -> None:
+                  brand: str | None = None, codes: tuple[str, ...] | list[str] = (),
+                  source: str | None = None) -> None:
     """Store one privacy-safe aggregate event for the Trends view.
 
-    The flagged domain is kept only for suspicious/malicious verdicts —
-    the domains people check on safe links are nobody's business.
-    Telemetry must never break a scan, so every failure is swallowed.
+    The flagged domain and impersonated brand are kept only for
+    suspicious/malicious verdicts — what people check on safe links is
+    nobody's business. Telemetry must never break a scan, so every
+    failure is swallowed.
     """
+    if verdict not in _FLAGGED:
+        domain, brand = None, None
+    codes_key = ",".join(codes)[:500]
+    # The burst cap guards only the poisonable surface (flagged
+    # domains/brands); plain scan counts always record.
+    if (domain or brand) and _over_burst_cap((source or "anon", scan_type, domain, brand, codes_key)):
+        return
     try:
         db = SessionLocal()
         try:
@@ -86,19 +119,20 @@ def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | N
         logger.debug("scan-event recording failed", exc_info=True)
 
 
-def _record_url_event(raw_url: str, report) -> None:
+def _record_url_event(raw_url: str, report, source: str | None = None) -> None:
     _record_event(
         "url", report.verdict, report.risk_score,
         domain=url_analyzer.registrable_domain(raw_url),
         brand=url_analyzer.impersonated_brand(raw_url),
         codes=[f["code"] for f in report.findings],
+        source=source,
     )
 
 
 @router.post("/url")
-async def check_url(body: UrlRequest):
+async def check_url(body: UrlRequest, request: Request):
     report = url_analyzer.analyze_url(body.url)
-    _record_url_event(body.url, report)
+    _record_url_event(body.url, report, source=client_ip(request))
     return report.as_dict()
 
 
@@ -132,8 +166,12 @@ async def generate(body: GenerateRequest):
 
 async def _read_upload_capped(file: UploadFile) -> bytes:
     # Chunked, capped read: never buffer an unbounded upload in memory
-    # (a multi-GB "file" must not be able to OOM the service).
+    # (a multi-GB "file" must not be able to OOM the service). When the
+    # client declared a Content-Length up front, reject instantly
+    # instead of reading the body first.
     limit = settings.max_upload_bytes
+    if file.size is not None and file.size > limit:
+        raise HTTPException(413, f"File exceeds the {limit // (1024 * 1024)} MB scanning limit.")
     chunks: list[bytes] = []
     total = 0
     while True:
@@ -157,13 +195,14 @@ async def scan_upload(file: UploadFile = File(...)):
 
 
 @router.post("/email")
-async def check_email(body: EmailRequest):
+async def check_email(body: EmailRequest, request: Request):
     if not body.headers.strip() and not body.body.strip():
         raise HTTPException(400, "Provide email headers, body, or both.")
     result = email_analyzer.analyze_email(body.headers, body.body)
     _record_event("email", result["verdict"], result["risk_score"],
                   domain=result.get("from_domain") or None,
-                  codes=[f["code"] for f in result["findings"]])
+                  codes=[f["code"] for f in result["findings"]],
+                  source=client_ip(request))
     return result
 
 
@@ -181,19 +220,22 @@ async def audit(body: WebAuditRequest):
 
 
 @router.post("/message")
-async def check_message(body: MessageRequest):
+async def check_message(body: MessageRequest, request: Request):
     if not body.text.strip():
         raise HTTPException(400, "Paste a message to check.")
     result = message_analyzer.analyze_message(body.text)
     _record_event("message", result["verdict"], result["risk_score"],
-                  codes=[f["code"] for f in result["findings"]])
+                  codes=[f["code"] for f in result["findings"]],
+                  source=client_ip(request))
     return result
 
 
 def _checked_domain(raw: str) -> str:
     host = host_from_url(raw)
     if not is_valid_domain(host):
-        raise HTTPException(400, f"'{host or raw}' is not a valid domain name.")
+        # Generic on purpose: never reflect raw user input back in an
+        # error body (reflected-content hygiene, even in JSON).
+        raise HTTPException(400, "That doesn't look like a valid domain name.")
     return host
 
 
@@ -208,7 +250,7 @@ async def check_domain(body: DomainRequest):
 async def check_tls(body: TlsRequest):
     host = host_from_url(body.host)
     if not is_valid_host(host):
-        raise HTTPException(400, f"'{host or body.host}' is not a valid domain name or IP address.")
+        raise HTTPException(400, "That doesn't look like a valid domain name or IP address.")
     try:
         # TLS handshakes block; run in the threadpool like the audit.
         return await run_in_threadpool(tls_inspector.inspect_tls, host)
@@ -218,7 +260,7 @@ async def check_tls(body: TlsRequest):
 
 
 @router.post("/smart-scan")
-async def smart_scan_endpoint(body: SmartScanRequest):
+async def smart_scan_endpoint(body: SmartScanRequest, request: Request):
     """One box for anything pasted: Smart Scan detects whether the
     input is a link, an email or a message and runs the matching
     engine. The aggregate event recorded is the same one the dedicated
@@ -232,12 +274,15 @@ async def smart_scan_endpoint(body: SmartScanRequest):
         target = body.text.strip()
         _record_event("url", result["verdict"], result["risk_score"],
                       domain=url_analyzer.registrable_domain(target),
-                      brand=url_analyzer.impersonated_brand(target), codes=codes)
+                      brand=url_analyzer.impersonated_brand(target), codes=codes,
+                      source=client_ip(request))
     elif envelope["detected_type"] == "email":
         _record_event("email", result["verdict"], result["risk_score"],
-                      domain=result.get("from_domain") or None, codes=codes)
+                      domain=result.get("from_domain") or None, codes=codes,
+                      source=client_ip(request))
     else:
-        _record_event("message", result["verdict"], result["risk_score"], codes=codes)
+        _record_event("message", result["verdict"], result["risk_score"], codes=codes,
+                      source=client_ip(request))
     return envelope
 
 
@@ -249,19 +294,23 @@ _SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 
 @router.post("/url/stream")
-async def check_url_stream(body: UrlRequest):
+async def check_url_stream(body: UrlRequest, request: Request):
+    source = client_ip(request)
+
     async def gen():
         async for chunk in streaming.stream_url(body.url):
             yield chunk
-        _record_url_event(body.url, url_analyzer.analyze_url(body.url))
+        _record_url_event(body.url, url_analyzer.analyze_url(body.url), source=source)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/email/stream")
-async def check_email_stream(body: EmailRequest):
+async def check_email_stream(body: EmailRequest, request: Request):
     if not body.headers.strip() and not body.body.strip():
         raise HTTPException(400, "Provide email headers, body, or both.")
+
+    source = client_ip(request)
 
     async def gen():
         async for chunk in streaming.stream_email(body.headers, body.body):
@@ -269,7 +318,8 @@ async def check_email_stream(body: EmailRequest):
         result = email_analyzer.analyze_email(body.headers, body.body)
         _record_event("email", result["verdict"], result["risk_score"],
                       domain=result.get("from_domain") or None,
-                      codes=[f["code"] for f in result["findings"]])
+                      codes=[f["code"] for f in result["findings"]],
+                      source=source)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
@@ -291,16 +341,19 @@ async def audit_stream(body: WebAuditRequest):
 
 
 @router.post("/message/stream")
-async def check_message_stream(body: MessageRequest):
+async def check_message_stream(body: MessageRequest, request: Request):
     if not body.text.strip():
         raise HTTPException(400, "Paste a message to check.")
+
+    source = client_ip(request)
 
     async def gen():
         async for chunk in streaming.stream_message(body.text):
             yield chunk
         result = message_analyzer.analyze_message(body.text)
         _record_event("message", result["verdict"], result["risk_score"],
-                      codes=[f["code"] for f in result["findings"]])
+                      codes=[f["code"] for f in result["findings"]],
+                      source=source)
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_SSE_HEADERS)
 
@@ -315,7 +368,7 @@ async def check_domain_stream(body: DomainRequest):
 async def check_tls_stream(body: TlsRequest):
     host = host_from_url(body.host)
     if not is_valid_host(host):
-        raise HTTPException(400, f"'{host or body.host}' is not a valid domain name or IP address.")
+        raise HTTPException(400, "That doesn't look like a valid domain name or IP address.")
     return StreamingResponse(streaming.stream_tls(host), media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
@@ -359,14 +412,21 @@ def _as_utc(ts: datetime | None) -> datetime | None:
     return ts
 
 
+_trending_cache: tuple[float, dict] | None = None
+
+
 @public_router.get("/api/public/trending")
 async def trending(db: Session = Depends(get_db)):
+    global _trending_cache
+    cached_at = _trending_cache[0] if _trending_cache else 0.0
+    if _trending_cache and (_time.monotonic() - cached_at) < settings.trending_cache_seconds:
+        return _trending_cache[1]
     now = datetime.now(UTC)
     since = now - timedelta(days=30)
     rows = [r for r in db.query(ScanEvent).all() if (_as_utc(r.created_at) or now) >= since]
     total = len(rows)
     flagged_rows = [r for r in rows if r.verdict in _FLAGGED]
-    brands = Counter(r.brand for r in rows if r.brand)
+    brands = Counter(r.brand for r in flagged_rows if r.brand)
     domains = Counter(r.domain for r in flagged_rows if r.domain)
     patterns = Counter()
     for r in rows:
@@ -374,7 +434,7 @@ async def trending(db: Session = Depends(get_db)):
             if code and code != "clean":
                 patterns[code] += 1
     last7 = sum(1 for r in rows if (_as_utc(r.created_at) or now) >= now - timedelta(days=7))
-    return {
+    payload = {
         "window_days": 30,
         "total_scans": total,
         "flagged": len(flagged_rows),
@@ -392,6 +452,8 @@ async def trending(db: Session = Depends(get_db)):
             for code, count in patterns.most_common(5)
         ],
     }
+    _trending_cache = (_time.monotonic(), payload)
+    return payload
 
 
 @router.get("/history")

@@ -2,21 +2,22 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { ErrorNote } from "./Shared";
 
-/* The demo runs on free hosting with temporary storage: every
- * redeploy resets the account database, while the browser keeps its
- * login token — so a returning user can hold a token for an account
- * that no longer exists. Detect those 401s and end the session
- * gracefully with an explanation instead of a cryptic API error. */
+/* Session model: the access token lives only in page memory and the
+ * refresh token in an HttpOnly cookie — nothing auth-related sits in
+ * web storage where injected script could read it. When the access
+ * token expires (30 min) or the account is gone, a call returns a
+ * session 401: try one silent cookie refresh and retry; if that fails,
+ * end the session gracefully with an explanation. */
 const SESSION_ERRORS = ["Account no longer exists.", "Invalid or expired token.", "Authentication required.", "Invalid refresh token."];
 const SESSION_NOTICE =
-  "Your session ended — the free demo's storage resets whenever the app is redeployed, so demo accounts and vault items don't persist. Please create the account again, and never store real secrets in the demo.";
+  "Your session ended. Please log in again to open your vault.";
 
 function isSessionError(err: unknown): boolean {
   return err instanceof Error && SESSION_ERRORS.some((s) => err.message.includes(s));
 }
 
 export function VaultPanel() {
-  const [token, setToken] = useState<string>(() => localStorage.getItem("aegis_token") ?? "");
+  const [token, setToken] = useState<string>("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -27,17 +28,49 @@ export function VaultPanel() {
   const [opened, setOpened] = useState("");
   const [error, setError] = useState("");
 
-  function endSession() {
-    localStorage.removeItem("aegis_token");
+  function endSession(notice = true) {
     setToken("");
     setItems([]);
     setOpened("");
-    setError(SESSION_NOTICE);
+    if (notice) setError(SESSION_NOTICE);
   }
+
+  async function refreshSession(): Promise<string | null> {
+    try {
+      const r = await api.refresh();
+      setToken(r.access_token);
+      return r.access_token;
+    } catch {
+      return null;
+    }
+  }
+
+  // On first mount, restore the session from the refresh cookie (this
+  // is what keeps a user logged in across page reloads).
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await api.refresh();
+        if (!cancelled) setToken(r.access_token);
+      } catch (err) {
+        if (!cancelled && err instanceof Error && err.message.includes("Account no longer exists.")) {
+          setError("That account no longer exists. Please create it again.");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function load(t: string) {
     try { setItems(await api.vaultList(t)); }
-    catch (err) { if (isSessionError(err)) endSession(); else setItems([]); }
+    catch (err) {
+      if (isSessionError(err)) {
+        const fresh = await refreshSession();
+        if (fresh) { try { setItems(await api.vaultList(fresh)); return; } catch { /* fall through */ } }
+        endSession();
+      } else setItems([]);
+    }
   }
   useEffect(() => { if (token) void load(token); }, [token]);
 
@@ -45,7 +78,6 @@ export function VaultPanel() {
     e.preventDefault(); setError("");
     try {
       const r = mode === "login" ? await api.login(email, password) : await api.register(email, password);
-      localStorage.setItem("aegis_token", r.access_token);
       setToken(r.access_token);
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); }
   }
@@ -57,7 +89,13 @@ export function VaultPanel() {
       await api.vaultCreate(token, title, secret, master);
       setTitle(""); setSecret("");
       await load(token);
-    } catch (err) { if (isSessionError(err)) endSession(); else setError(err instanceof Error ? err.message : "Could not save item"); }
+    } catch (err) {
+      if (isSessionError(err)) {
+        const fresh = await refreshSession();
+        if (fresh) { await load(fresh); return; }
+        endSession();
+      } else setError(err instanceof Error ? err.message : "Could not save item");
+    }
   }
 
   async function open(id: number) {
@@ -66,7 +104,22 @@ export function VaultPanel() {
     try {
       const r = await api.vaultOpen(token, id, master);
       setOpened(r.secret);
-    } catch (err) { if (isSessionError(err)) endSession(); else setError(err instanceof Error ? err.message : "Could not open item"); }
+    } catch (err) {
+      if (isSessionError(err)) {
+        const fresh = await refreshSession();
+        if (fresh) {
+          try { const r = await api.vaultOpen(fresh, id, master); setOpened(r.secret); return; }
+          catch { /* fall through */ }
+        }
+        endSession();
+      } else setError(err instanceof Error ? err.message : "Could not open item");
+    }
+  }
+
+  async function logout() {
+    await api.logout();
+    endSession(false);
+    setError("");
   }
 
   if (!token) {
@@ -97,14 +150,14 @@ export function VaultPanel() {
         <button>Add encrypted item</button>
       </form>
       <ErrorNote error={error} />
-      <p className="meta">Demo note: storage resets on redeploys — don't keep real secrets here.</p>
+      <p className="meta">Demo note: don't keep real secrets here.</p>
       <ul className="vault-list">
         {items.map((i) => (
           <li key={i.id}><span>{i.title}</span><button className="secondary" onClick={() => open(i.id)}>Open</button></li>
         ))}
       </ul>
       {opened && <p className="generated">Decrypted: <code>{opened}</code></p>}
-      <button className="linklike" onClick={() => { localStorage.removeItem("aegis_token"); setToken(""); }}>Log out</button>
+      <button className="linklike" onClick={() => void logout()}>Log out</button>
     </section>
   );
 }

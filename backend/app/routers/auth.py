@@ -7,9 +7,10 @@ Generic error messages avoid revealing whether an email is registered.
 
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import get_db
 from app.models import User
 from app.schemas import LoginRequest, RegisterRequest, TokenResponse
@@ -39,8 +40,34 @@ def _tokens(user: User) -> TokenResponse:
     )
 
 
+# The browser client never persists a token in web storage (an XSS would
+# be able to read localStorage). The refresh token travels as an
+# HttpOnly, SameSite=Strict cookie scoped to /api/auth; the short-lived
+# access token lives only in page memory. Non-browser API clients may
+# still use the refresh_token field in the JSON body.
+REFRESH_COOKIE = "aegis_refresh"
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        REFRESH_COOKIE,
+        token,
+        max_age=settings.refresh_token_days * 24 * 3600,
+        path="/api/auth",
+        httponly=True,
+        secure=settings.environment == "production",
+        samesite="strict",
+    )
+
+
+def _issue(user: User, response: Response) -> TokenResponse:
+    tokens = _tokens(user)
+    _set_refresh_cookie(response, tokens.refresh_token)
+    return tokens
+
+
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
     from app.modules.password_lab import assess_password
 
     assessment = assess_password(body.password)
@@ -56,11 +83,11 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return _tokens(user)
+    return _issue(user, response)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
     from app.rate_limit import account_limiter
 
     if not account_limiter.allow(f"login:{body.email.lower()}"):
@@ -82,16 +109,32 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     user.failed_logins = 0
     user.locked_until = None
     db.commit()
-    return _tokens(user)
+    return _issue(user, response)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh(body: dict, db: Session = Depends(get_db)):
-    token = body.get("refresh_token", "")
+def refresh(body: dict, request: Request, response: Response, db: Session = Depends(get_db)):
+    cookie_token = request.cookies.get(REFRESH_COOKIE)
+    if cookie_token:
+        # Cookie-based refresh is for the first-party web client only.
+        # Requiring a custom header means a cross-site form/fetch cannot
+        # trigger it (custom headers force a CORS preflight), which —
+        # together with SameSite=Strict — closes the CSRF angle.
+        if request.headers.get("x-aegis-refresh") != "1":
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token.")
+        token = cookie_token
+    else:
+        token = body.get("refresh_token", "")
     email = decode_token(token, expected_type="refresh")
     if email is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid refresh token.")
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Account no longer exists.")
-    return _tokens(user)
+    return _issue(user, response)
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(REFRESH_COOKIE, path="/api/auth")
+    return {"detail": "Logged out."}

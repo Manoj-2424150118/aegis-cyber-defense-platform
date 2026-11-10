@@ -38,6 +38,18 @@ class SlidingWindowLimiter:
 
 general_limiter = SlidingWindowLimiter(settings.rate_limit_per_minute)
 auth_limiter = SlidingWindowLimiter(settings.auth_rate_limit_per_minute)
+fetch_limiter = SlidingWindowLimiter(settings.fetch_rate_limit_per_minute)
+
+# Route prefixes whose handlers perform outbound network work (HTTP fetch,
+# redirect tracing, DNS lookups, TLS handshakes) against user-supplied
+# targets. Without a tight budget these turn the service into an anonymous
+# proxy/scanner and a resource-exhaustion vector.
+_FETCH_PREFIXES = (
+    "/api/tools/web-audit",
+    "/api/tools/url/resolve",
+    "/api/tools/tls",
+    "/api/tools/domain",
+)
 # Per-account limiter, applied inside the auth routes. Per-IP limits alone
 # dilute when a platform's edge uses several proxy addresses; keying on the
 # target account cannot be diluted and directly throttles credential
@@ -63,8 +75,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)  # platform health checks are exempt
         client = client_ip(request)
         is_auth = request.url.path.startswith("/api/auth")
-        limiter = auth_limiter if is_auth else general_limiter
-        if not limiter.allow(f"{client}:{request.url.path if is_auth else 'general'}"):
+        is_fetch = request.url.path.startswith(_FETCH_PREFIXES)
+        if is_fetch:
+            limiter, key = fetch_limiter, f"{client}:fetch"
+        elif is_auth:
+            limiter, key = auth_limiter, f"{client}:{request.url.path}"
+        else:
+            limiter, key = general_limiter, f"{client}:general"
+        if not limiter.allow(key):
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Too many requests. Please slow down and try again shortly."},

@@ -17,4 +17,4 @@ COPY --from=frontend-build /build/dist ./static
 RUN useradd --create-home aegis && chown -R aegis:aegis /app
 USER aegis
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --no-server-header"]
