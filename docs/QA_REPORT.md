@@ -103,3 +103,34 @@ Full presentation-layer redesign (commits 2054237, 44f9bba, 291ec20; API untouch
 
 - Free-tier hosting sleeps when idle (first load ~1 min) and shares CPU; Argon2 operations take ~2s there. Paid tier or a second region removes this; the application code is unchanged.
 - Heuristic engines can false-positive/false-negative at the margins — findings are always explained so users can judge. See `SECURITY.md`.
+
+## v2.0.0 addendum — Detection-engine upgrade (10 Nov 2026)
+
+Implemented the adversary-informed detection spec (`PROMPT-detection-engine-upgrade.md`) as v2.0.0.
+The spec's §1 "known gaps" (rate limits, upload cap, domain normalisation, trending poisoning)
+were already closed in v1.8.1; this release is the detection work itself:
+
+- **Signal layer on every result** (`signals` with category/severity/confidence/prevention,
+  `summary`, `prevention` playbook, `confidence`, `verdict_band`, `meta.schema_version=2.0`);
+  legacy `findings`/`risk_score`/`verdict`/`grade` untouched — the pinned 85-point sample still scores 85.
+- **URL**: NFKC/zero-width normalisation, embedded credentials, Unicode + mixed-script homograph
+  hosts, free-hosting lure abuse, double-encoded paths, blob: scheme, 5 more abuse TLDs.
+- **Email**: BEC payroll diversion, payment-instruction phrases, in-email credential forms,
+  Message-ID mismatch, missing Received chain.
+- **Message**: parcel, family-emergency, tech-support, loan and investment playbooks; Hinglish
+  terms; callback numbers; OTP-disclaimer false-positive guard (a bank's own "never share your
+  OTP" warning scored 30 before the guard, 0 after — bait detection now strips disclaimer
+  sentences before matching).
+- **File**: PDF active content, OOXML remote-template injection, archive traversal/nested/
+  encrypted members, ETH wallet IOCs.
+- **Domain/TLS**: DKIM probing + key size, SPF lookup count, DMARC pct/sp gaps, dangling-CNAME
+  takeover, RDAP age; TLS signature/key-size checks — all 0-point posture findings, grades unchanged.
+- **Password**: keyboard walks, sequences, years, leet-normalised dictionary, repeats (caps + `patterns`).
+- **New: Secret Scanner** (10th tool) — provider key formats, private keys, DB URIs, JWTs,
+  entropy assignments, Luhn cards, seed phrases; noisy-OR scoring with category caps + hard
+  rules; masked output only, redaction enforced by test; Smart Scan routes secret blobs to it.
+- Deviations (documented in docs/DETECTION.md): no key-requiring reputation APIs (₹0 budget —
+  all detectors local/deterministic), no QR endpoint (needs a system barcode lib), SSRF TOCTOU
+  residual unchanged from v1.8.1, legacy verdict vocabulary kept beside the new 5-band field.
+- Gate: 186 pytest (169 + 17 new golden/adversarial/determinism/redaction), ruff clean,
+  bandit no medium/high severity. Live-verified on production (health reports 2.0.0).
