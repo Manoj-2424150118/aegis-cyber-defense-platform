@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>What Are DMARC, SPF and DKIM? Email Authentication Explained | Aegis Guides</title>
+<meta name="description" content="SPF, DKIM and DMARC explained plainly: what each record does, why alignment matters, and how to check any domain&#x27;s posture for free." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/guides/what-is-dmarc-spf-dkim" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="What Are DMARC, SPF and DKIM? Email Authentication Explained | Aegis Guides" />
+<meta property="og:description" content="SPF, DKIM and DMARC explained plainly: what each record does, why alignment matters, and how to check any domain&#x27;s posture for free." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/guides/what-is-dmarc-spf-dkim" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "What are DMARC, SPF and DKIM?", "description": "SPF, DKIM and DMARC explained plainly: what each record does, why alignment matters, and how to check any domain's posture for free.", "dateModified": "2026-11-10", "author": {"@type": "Organization", "name": "Aegis"}}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Guide</p>
+<h1>What are DMARC, SPF and DKIM?</h1>
+
+<p class="lede">Email was designed without sender identity, and these three DNS records are the retrofit. Together they decide whether a stranger can send mail that claims to be from your domain — the trick behind most CEO fraud.</p>
+<h2>SPF: who may send</h2>
+<p>A Sender Policy Framework record lists the servers allowed to send for a domain. Receivers compare the sending server's IP against the list. Two limits matter: SPF authenticates the <em>envelope</em> sender (often invisible to you), and it breaks after ten DNS lookups — a limit bloated records silently exceed, voiding the check.</p>
+<h2>DKIM: a signature on the message</h2>
+<p>DomainKeys Identified Mail signs message headers and body with a private key; receivers verify with the public key published in DNS under a selector (<code>selector._domainkey.domain</code>). A valid signature proves the mail really passed through the domain's infrastructure unmodified. Keys under 2048 bits are below the modern baseline.</p>
+<h2>DMARC: the policy that ties them together</h2>
+<p>DMARC (Domain-based Message Authentication, Reporting and Conformance) requires that SPF or DKIM <em>align</em> with the domain in the visible From header — the one humans read — and tells receivers what to do on failure: <code>p=none</code> (watch only), <code>p=quarantine</code> (spam folder), or <code>p=reject</code> (refuse delivery). Only enforcement policies actually stop spoofing; <code>p=none</code> forever is a reporting project, not protection. Watch also for <code>pct</code> below 100 (partial rollout) and a weak subdomain policy (<code>sp=</code>), which leave subdomains spoofable.</p>
+<h2>Why it matters to you</h2>
+<ul>
+<li><strong>Receiving:</strong> a sender domain with enforced DMARC is measurably harder to impersonate. Check the domains that email you about money with the <a href="/tools/domain-spoofing-check">domain security checker</a>.</li>
+<li><strong>Sending:</strong> without DMARC enforcement, anyone can email your customers, staff or family as you — and you cannot stop them.</li>
+<li><strong>Investigating:</strong> in a suspicious email's headers, failed or misaligned authentication plus a payment request is the classic business-email-compromise signature. The <a href="/tools/email-phishing-checker">email analyser</a> reads those results for you.</li>
+</ul>
+<h2>A sane rollout order</h2>
+<p>Inventory your senders → publish SPF and DKIM for each → DMARC at <code>p=none</code> with reporting to learn your traffic → fix stragglers → raise to <code>quarantine</code>, then <code>reject</code>, with <code>pct=100</code> and an explicit subdomain policy. Most small domains finish in a week; the reporting stage is where the surprises live.</p>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

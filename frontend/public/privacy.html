@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy | Aegis</title>
+<meta name="description" content="Aegis privacy policy — plain-language, matching the running product." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/privacy" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Privacy Policy | Aegis" />
+<meta property="og:description" content="Aegis privacy policy — plain-language, matching the running product." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/privacy" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Policy</p>
+<h1>Privacy policy</h1>
+
+<p class="lede">Aegis is a security tool; its privacy model is part of the product. This page describes what is actually stored, in plain language, and matches the running code.</p>
+<h2>Anonymous checks</h2>
+<p>Tool inputs (URLs, emails, messages, files, text) are processed in the request and are <strong>not stored</strong>. Files are analysed in memory only. Two aggregate systems keep no content: the public trends feed records only scan type, verdict, score band, finding codes and — for flagged results only — the brand or registrable domain involved; daily fair-use counters store an HMAC hash of the caller identity, never a raw IP address, and self-delete within 48 hours.</p>
+<h2>Accounts</h2>
+<p>An account stores your email, an Argon2id password hash (never the password), your plan, optional two-factor settings, the scan-history summaries you generate while signed in, and your vault items <strong>as AES-256-GCM ciphertext</strong> encrypted under your master password. The master password is never stored; we cannot read your vault items and cannot recover them for you.</p>
+<h2>What we never do</h2>
+<ul>
+<li>No sale or sharing of personal data, ever. Credentials are not a revenue source.</li>
+<li>No third-party advertising or analytics trackers at this time. Any future advertising will be consent-gated and follow the <a href="/ad-policy">ad policy</a>.</li>
+<li>No ads or trackers on authenticated or vault pages.</li>
+</ul>
+<h2>Your rights</h2>
+<p>Under India's DPDP Act 2023, the GDPR and similar laws you may access, correct, export or delete your data. Deleting your account removes your history and vault ciphertext. Contact via the repository or security.txt channels; verified requests are actioned within 30 days.</p>
+<h2>Security</h2>
+<p>Report vulnerabilities via <a href="/.well-known/security.txt">security.txt</a>. Breach notification follows applicable law (including DPDP and GDPR timelines where they apply).</p>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

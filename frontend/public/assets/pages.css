@@ -1,0 +1,47 @@
+:root{--bg:#F6F4EF;--surface:#FFFDF8;--ink:#191D1A;--ink2:#49504A;--ink3:#5F665C;
+--line:#E2DED2;--accent:#0E7A57;--accent-ink:#0B5C43}
+@media (prefers-color-scheme:dark){:root{--bg:#0A0C0B;--surface:#101311;--ink:#EDEBE4;
+--ink2:#B9BDB2;--ink3:#9AA294;--line:#232824;--accent:#2FB37F;--accent-ink:#7FD6AE}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font-family:"Geist Sans",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.65}
+.wrap{max-width:46rem;margin:0 auto;padding:0 20px}
+header.site{border-bottom:1px solid var(--line);background:var(--surface)}
+header.site .wrap{display:flex;align-items:center;gap:10px;padding-top:14px;padding-bottom:14px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:650;letter-spacing:-.02em;color:var(--ink);text-decoration:none}
+.logo svg{flex:none}
+header.site nav{margin-left:auto;display:flex;gap:18px;font-size:.92rem}
+header.site nav a{color:var(--ink2);text-decoration:none}
+header.site nav a:hover{color:var(--accent-ink)}
+main{padding:34px 0 10px}
+.kicker{font-family:"Geist Mono",ui-monospace,monospace;font-size:.78rem;letter-spacing:.14em;
+text-transform:uppercase;color:var(--accent-ink);margin:0 0 10px}
+h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:2.35rem;
+line-height:1.12;letter-spacing:-.015em;margin:0 0 14px}
+h2{font-size:1.28rem;letter-spacing:-.02em;margin:34px 0 10px}
+h3{font-size:1.02rem;margin:20px 0 6px}
+p,li{color:var(--ink2)}
+.lede{font-size:1.13rem;color:var(--ink)}
+a{color:var(--accent-ink)}
+ul{padding-left:1.15rem}
+li{margin:5px 0}
+.cta{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;
+font-weight:600;padding:12px 22px;border-radius:999px;margin:16px 0 4px}
+.cta:hover{filter:brightness(1.07)}
+.note{font-size:.9rem;color:var(--ink3)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 20px 14px;margin:18px 0}
+details{border-top:1px solid var(--line);padding:11px 0}
+details:first-of-type{border-top:none}
+summary{cursor:pointer;font-weight:600;color:var(--ink)}
+.related{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.related a{border:1px solid var(--line);border-radius:999px;padding:6px 13px;text-decoration:none;
+font-size:.9rem;color:var(--ink);background:var(--surface)}
+.related a:hover{border-color:var(--accent)}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:.95rem}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--surface)}
+footer.site{border-top:1px solid var(--line);margin-top:44px;padding:22px 0 30px;font-size:.9rem}
+footer.site nav{display:flex;flex-wrap:wrap;gap:8px 18px}
+footer.site a{color:var(--ink2);text-decoration:none}
+footer.site a:hover{color:var(--accent-ink)}
+code{font-family:"Geist Mono",ui-monospace,monospace;font-size:.88em}

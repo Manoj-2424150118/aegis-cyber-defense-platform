@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How to Check If a Link Is Safe Before You Click | Aegis Guides</title>
+<meta name="description" content="A practical method to check if a link is safe: read the real domain, spot look-alikes, trace redirects, and verify through official channels." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/guides/how-to-check-if-a-link-is-safe" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="How to Check If a Link Is Safe Before You Click | Aegis Guides" />
+<meta property="og:description" content="A practical method to check if a link is safe: read the real domain, spot look-alikes, trace redirects, and verify through official channels." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/guides/how-to-check-if-a-link-is-safe" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "Article", "headline": "How to check if a link is safe before you click", "description": "A practical method to check if a link is safe: read the real domain, spot look-alikes, trace redirects, and verify through official channels.", "dateModified": "2026-11-10", "author": {"@type": "Organization", "name": "Aegis"}}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Guide</p>
+<h1>How to check if a link is safe before you click</h1>
+
+<p class="lede">Most phishing succeeds not because the fake page is perfect, but because the link was never really looked at. This is the two-minute method defenders use — no tools required for the first steps, and a free checker for the rest.</p>
+<h2>1. Read the domain, right to left</h2>
+<p>A URL's identity is its <em>registrable domain</em> — the part immediately before the first single slash. In <code>paypal.com.secure-login.xyz/login</code> the domain is <code>secure-login.xyz</code>; "paypal.com" is just a subdomain decoration. In <code>secure@paypal.com@evil.example/x</code>, everything before the last <code>@</code> is a username, and the real host comes after it. Attackers count on left-to-right reading. Read the host backwards and the tricks fall apart.</p>
+<h2>2. Look for look-alike spelling</h2>
+<p>Homograph and typosquat domains swap characters: <code>paypa1.com</code> (digit one), <code>rnicrosoft.com</code> (r+n posing as m), or a Cyrillic "а" that renders identically to a Latin "a". If a domain needs squinting, treat it as hostile. Aegis's <a href="/tools/phishing-link-checker">link checker</a> flags mixed-script hosts automatically — the human eye often cannot.</p>
+<h2>3. Distrust urgency, not just spelling</h2>
+<p>Plenty of phishing uses the real brand's name in the path of an unrelated or free-hosted domain (<code>something.pages.dev/paypal-verify</code>). The message around the link matters as much as the link: account freezes, parcel fees, refunds expiring, a boss who cannot talk — pressure is the payload. Slow down exactly when a message tells you not to.</p>
+<h2>4. Preview before you visit</h2>
+<p>On phones, long-press a link to see its true destination. For short links, run them through a <a href="/tools/redirect-chain-tracer">redirect tracer</a> so a server — not your browser — follows the chain and shows the final page. Never "just open it to see": modern phishing pages fingerprint and sometimes exploit on load.</p>
+<h2>5. Verify out of band</h2>
+<p>If the link asks you to log in, pay, or confirm anything, ignore it and go to the service the way you always do — the official app or a domain you type yourself. A legitimate request survives that detour; a phishing page cannot follow you there.</p>
+<h2>The 30-second checklist</h2>
+<ul>
+<li>Registrable domain is exactly the brand's real domain — no extra words, hyphens or strange TLDs.</li>
+<li>No IP addresses, no <code>@</code> tricks, no percent-encoded mush in the host.</li>
+<li>The message's urgency has a reason that exists outside the message.</li>
+<li>Redirects, if any, end on the same domain you expected.</li>
+<li>When in doubt: navigate manually. Links are a convenience, not an obligation.</li>
+</ul>
+<p>Run any link through the <a href="/tools/phishing-link-checker">free phishing link checker</a> for the automated version of this method — every signal named, every point explained.</p>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>
