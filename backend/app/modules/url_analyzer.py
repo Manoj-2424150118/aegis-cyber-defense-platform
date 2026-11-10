@@ -17,13 +17,14 @@ finding, because a security tool that cannot explain itself is not trusted.
 import ipaddress
 import math
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from app.modules.detection import enrich
 from app.modules.remediation import fix_for
 
-SUSPICIOUS_TLDS = {"zip", "mov", "top", "xyz", "click", "loan", "men", "gq", "cf", "tk", "ml", "work", "party", "review", "science", "trade", "date", "faith", "accountant", "download", "racing", "win", "vip", "best", "live"}
+SUSPICIOUS_TLDS = {"zip", "mov", "top", "xyz", "click", "loan", "men", "gq", "cf", "tk", "ml", "work", "party", "review", "science", "trade", "date", "faith", "accountant", "download", "racing", "win", "vip", "best", "live", "sbs", "cyou", "bond", "cfd", "quest"}
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "cutt.ly", "rebrand.ly", "shorturl.at", "rb.gy", "t.ly"}
 BRANDS = {
     "paypal": "paypal.com", "apple": "apple.com", "microsoft": "microsoft.com",
@@ -54,6 +55,43 @@ TRACKING_WRAPPERS = {
     "trk.klaviyomail.com", "click.pstmrk.it",
     "links.marketo.net", "click.hs-analytics.net", "t.hsms03.com",
 }
+# Free hosting abused as phishing infrastructure: a brand or credential
+# lure hosted here inherits none of the platform's trust.
+FREE_HOSTS = {
+    "github.io", "pages.dev", "vercel.app", "netlify.app", "weebly.com",
+    "wixsite.com", "blogspot.com", "wordpress.com", "glitch.me", "surge.sh",
+    "firebaseapp.com", "web.app", "azurewebsites.net", "herokuapp.com",
+    "repl.co", "replit.app", "onrender.com", "fly.dev", "streamlit.app",
+}
+# Zero-width and bidi-control characters: invisible in every UI, but
+# they change what a URL actually is — a filter-evasion staple.
+_INVISIBLE = dict.fromkeys(
+    [ord(c) for c in "\u200b\u200c\u200d\ufeff\u202a\u202b\u202c\u202d\u202e\u2060\u00ad"], None)
+
+
+def _normalize(text: str) -> str:
+    """NFKC + strip invisible characters, so analysis sees the URL the
+    browser will navigate to — not the disguised one a filter saw."""
+    return unicodedata.normalize("NFKC", text.translate(_INVISIBLE))
+
+
+def _scripts(text: str) -> set[str]:
+    found: set[str] = set()
+    for ch in text:
+        o = ord(ch)
+        if "a" <= ch <= "z" or 0x00C0 <= o <= 0x024F:
+            found.add("latin")
+        elif 0x0400 <= o <= 0x04FF:
+            found.add("cyrillic")
+        elif 0x0370 <= o <= 0x03FF:
+            found.add("greek")
+        elif 0x0590 <= o <= 0x05FF:
+            found.add("hebrew")
+        elif 0x0600 <= o <= 0x06FF:
+            found.add("arabic")
+    return found
+
+
 PHISH_KEYWORDS = [
     "verify", "login", "signin", "secure", "account", "update", "confirm",
     "password", "banking", "wallet", "suspended", "unlock", "recover",
@@ -112,9 +150,10 @@ class _UrlContext:
 
     def __init__(self, raw_url: str):
         self.raw_url = raw_url
+        raw_url = _normalize(raw_url)
         lowered = raw_url.strip().lower()
         self.dangerous_scheme = next(
-            (s for s in ("javascript:", "data:", "vbscript:", "file:") if lowered.startswith(s)), None
+            (s for s in ("javascript:", "data:", "vbscript:", "file:", "blob:") if lowered.startswith(s)), None
         )
         url = raw_url.strip()
         if "://" not in url:
@@ -175,6 +214,14 @@ def _stage_host(ctx: _UrlContext) -> None:
         ctx.add(35, "obfuscated-ip", "Host is an IP address disguised in numeric/hex/octal form — a blocklist-evasion trick.")
     if host.startswith("xn--") or ".xn--" in host:
         ctx.add(30, "punycode", "Punycode domain — often used for homograph attacks that imitate real brands.")
+    if any(ord(c) > 127 for c in host):
+        ctx.add(25, "unicode-host", "The domain contains non-ASCII characters — it may be a homograph look-alike that merely *renders* like a real brand.")
+        if len(_scripts(host)) >= 2:
+            ctx.add(30, "mixed-script-host", "The domain mixes writing systems (e.g. Latin + Cyrillic) — a textbook homograph attack: the characters look Latin but are not.")
+    if any(host == fh or host.endswith("." + fh) for fh in FREE_HOSTS):
+        lure = [kw for kw in PHISH_KEYWORDS if kw in host]
+        if lure:
+            ctx.add(20, "free-host-abuse", f"Credential-lure wording ({', '.join(sorted(set(lure)))}) hosted on a free hosting platform — a disposable phishing page pattern: free to create, quick to abandon.")
     if len(labels) > 4:
         ctx.add(15, "many-subdomains", f"{len(labels)} domain labels — deep subdomains are used to hide the real owner.")
     tld = labels[-1] if labels else ""
@@ -207,6 +254,8 @@ def _stage_path(ctx: _UrlContext) -> None:
     parsed = ctx.parsed
     if "@" in parsed.netloc:
         ctx.add(30, "userinfo-trick", "Contains '@' in the address — browsers ignore everything before it, hiding the real host.")
+    if parsed.password:
+        ctx.add(20, "embedded-credentials", "The address embeds a username AND password (user:pass@host) — no legitimate link needs credentials baked into it; they are there to disguise the destination or bypass a login gate.")
     if "//" in parsed.path:
         ctx.add(10, "double-slash", "Double slash in the path — often used as an open-redirect / obfuscation trick.")
     path_query = unquote(f"{parsed.path} {parsed.query}").lower()
@@ -220,6 +269,8 @@ def _stage_path(ctx: _UrlContext) -> None:
         ctx.add(10, "very-long", f"URL is {len(ctx.url)} characters — long URLs hide the destination and payload.")
     if re.search(r"%[0-9a-fA-F]{2}", parsed.path) and parsed.path.count("%") >= 3:
         ctx.add(10, "encoded-path", "Heavily percent-encoded path — used to smuggle payloads past filters.")
+    if "%25" in parsed.path:
+        ctx.add(10, "double-encoded", "The path is double-encoded (%25…) — each decode layer hides the real payload from a different filter.")
     path_lower = parsed.path.lower()
     if path_lower.endswith((".exe", ".msi", ".apk", ".dmg", ".scr", ".bat", ".cmd", ".jar", ".hta")):
         ctx.add(25, "executable-download", "This link downloads a program file — message links are the #1 malware delivery route.")
