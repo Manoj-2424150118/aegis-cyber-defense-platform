@@ -359,7 +359,7 @@ section[id], .card[id] { scroll-margin-top: 136px; }
 .filter-count { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-3); white-space: nowrap; }
 
 /* ---------- Tool grid + cards ---------- */
-.grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: stretch; }
+.grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
 @media (min-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1280px) { .grid { grid-template-columns: repeat(3, 1fr); } }
 .tool-cell { display: flex; min-width: 0; }

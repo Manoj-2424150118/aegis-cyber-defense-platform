@@ -83,8 +83,12 @@ time; the packages are not runtime dependencies.
   pasting multi-line text into a one-line input silently truncates it.
   Enter submits; Shift-Enter adds a line.
 - The "Coverage" cards remain as a navigation layer above the tool
-  grid — the interactive tools themselves are the uniform, equal-height
-  grid the brief specifies.
+  grid. The tool grid itself is a uniform 1/2/3-column grid, but rows
+  use `align-items: start`: when one tool's result makes its card grow,
+  its neighbours keep their natural height instead of stretching into
+  mostly-empty boxes — the owner's standing layout preference, confirmed
+  in QA when equal-height stretching left large blank panels. Coverage
+  cards (uniform content) do stretch to equal height.
 - Light-theme `--line` hairlines sit below 3:1 by design (decorative
   separation, not component identification); controls and focus states
   meet the UI contrast requirements.
