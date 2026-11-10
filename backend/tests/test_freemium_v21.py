@@ -198,3 +198,18 @@ def test_totp_codes_are_time_bound():
     mfa_key = totp_mod.generate_secret()
     old = totp_mod._code_at(mfa_key, time.time() - 300)
     assert not totp_mod.verify(mfa_key, old)
+
+
+def test_ads_path_gets_frameable_csp_not_deny(client):
+    # /ads/* responses must be frameable by the SPA itself (sandboxed
+    # house-ad iframes): dedicated CSP, no X-Frame-Options denial.
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.get("/ads/house.html")
+    # In the test environment there is no built static dir, so the file
+    # itself 404s — what matters is the header treatment of the path.
+    assert "frame-ancestors 'self'" in r.headers.get("content-security-policy", "")
+    assert r.headers.get("x-frame-options") is None

@@ -63,7 +63,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         if request.url.path.startswith("/ads/"):
             response.headers["Content-Security-Policy"] = ADS_CSP
-            response.headers.pop("x-frame-options", None)
+            if "x-frame-options" in response.headers:
+                del response.headers["x-frame-options"]
             response.headers["Cache-Control"] = "no-cache"
             if "server" in response.headers:
                 del response.headers["server"]
