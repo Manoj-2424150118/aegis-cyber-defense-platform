@@ -90,6 +90,15 @@ An owner-commissioned black-box assessment of the live v1.8.0 deployment (1 High
 - **§6.1 SSRF TOCTOU (accepted residual, documented):** the guard resolves and validates every hop immediately before connecting and re-validates each redirect; full IP-pinning for HTTPS (pinned IP + SNI/Host + cert verification) is not expressible with the stdlib fetcher and is out of proportion for a public demo whose targets are public hosts only. The window is milliseconds and private ranges are refused at validation time on every hop.
 - **Audit side-effect cleanup (Appendix A of the audit):** the probe account `secprobe+1794323411@example.com` and the junk `scan_events` domains it and earlier probes created were deleted from the production database; counts verified by follow-up SELECTs (see the session record).
 
+## v1.9.0 addendum — "Quiet Authority" UI overhaul (10 Nov 2026)
+
+Full presentation-layer redesign (commits 2054237, 44f9bba, 291ec20; API untouched, 169 backend tests unchanged and green). Design rationale and token/component documentation: `docs/DESIGN.md`.
+
+- **Design system replaced:** warm-ink/paper neutrals, one jade accent, hairline structure, layered surfaces. Removed: emerald+neon-cyan palette, glassmorphism, glow shadows, gradient text, emoji icons, CSS-columns masonry, the terminal-style console. Fonts self-hosted (Geist Sans/Mono + Instrument Serif, OFL, 216 KB of latin WOFF2 subsets) — zero third-party requests; strict CSP untouched and satisfied (no inline script/style; theme bootstrap remains the external file from v1.8.1).
+- **New components:** SVG logo/favicon, segmented theme control, mobile nav sheet, hero command bar (Ctrl-K / "/" focus) with a real sample-result panel, uniform equal-height tool grid, `ScanTimeline` (aria-live) replacing the console, verdict/findings system with copy summary/JSON actions, labelled forms, password show/hide, drag-and-drop file zone, ranked trending bars, privacy band, sitemap footer.
+- **Accessibility gate:** token contrast computed for both themes — all text pairs ≥ 4.5:1 (light `--text-3` darkened to `#5F665C` = 5.39, light `--warn` to `#96600A` = 5.28 after first-pass failures); focus ring 11.98 (dark) / 4.85 (light); skip link, landmarks, 44px targets, reduced-motion and forced-colors support.
+- **Performance:** CSS 29.7 KB (6.1 KB gzip), JS 285 KB (85 KB gzip), no new runtime dependencies (Fontsource packages were build-time-only and removed after harvesting the font files).
+
 ## Known residual limits
 
 - Free-tier hosting sleeps when idle (first load ~1 min) and shares CPU; Argon2 operations take ~2s there. Paid tier or a second region removes this; the application code is unchanged.
