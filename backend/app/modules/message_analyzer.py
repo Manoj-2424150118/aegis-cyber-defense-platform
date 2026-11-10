@@ -96,12 +96,16 @@ def _stage_links(ctx: _MsgContext) -> None:
 
 
 def _stage_harvest(ctx: _MsgContext) -> None:
-    hits = ctx.hits(OTP_BAIT)
+    # Judge bait on the text with disclaimer sentences removed: a
+    # bank's own "never share your OTP" warning contains the bait
+    # phrases as substrings, so raw substring matching flags the very
+    # messages that protect people.
+    kept = [sent for sent in re.split(r"[.!?\n]", ctx.lower)
+            if not any(d in sent for d in OTP_DISCLAIMER)]
+    cleaned = " ".join(kept)
+    hits = [p for p in OTP_BAIT if p in cleaned]
     if hits:
-        requested = any(p in ctx.lower for p in OTP_REQUEST)
-        disclaimer_only = not requested and any(d in ctx.lower for d in OTP_DISCLAIMER)
-        if not disclaimer_only:
-            ctx.add(30, "credential-bait", f"The message fishes for secrets ({', '.join(sorted(set(hits)))}) — no bank, company or officer ever asks for an OTP, PIN or CVV by message.")
+        ctx.add(30, "credential-bait", f"The message fishes for secrets ({', '.join(sorted(set(hits)))}) — no bank, company or officer ever asks for an OTP, PIN or CVV by message.")
     if ("call" in ctx.lower or "phone" in ctx.lower) and _PHONE_RE.search(ctx.text):
         ctx.add(8, "callback-number", "The message pushes you to call a number it supplies — scammers' 'support'/'officer' lines are answered by the scam team itself. Only ever call numbers printed on your card or in the official app.")
     upi = _UPI_RE.findall(ctx.text)
