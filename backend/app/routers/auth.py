@@ -13,10 +13,21 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db
 from app.models import User
-from app.schemas import LoginRequest, RegisterRequest, TokenResponse
+from app.deps import get_current_user
+from app.modules import totp
+from app.schemas import (
+    LoginRequest,
+    MfaConfirmRequest,
+    MfaDisableRequest,
+    MfaLoginRequest,
+    MfaSetupRequest,
+    RegisterRequest,
+    TokenResponse,
+)
 from app.security import (
     create_access_token,
     create_refresh_token,
+    create_token,
     decode_token,
     hash_password,
     is_locked,
@@ -67,14 +78,22 @@ def _issue(user: User, response: Response) -> TokenResponse:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
-    from app.modules.password_lab import assess_password
+async def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+    from app.modules.password_lab import assess_password, breach_check
 
     assessment = assess_password(body.password)
     if assessment["is_common_password"] or assessment["score"] < 30:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "That password is too weak or too common. Choose a longer, unique password or passphrase.",
+        )
+    # Refuse passwords already known to breach corpora (k-anonymity lookup;
+    # when the service is unreachable the local gates above still apply).
+    breach = await breach_check(body.password)
+    if breach.get("breached"):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "That password has appeared in known data breaches. Choose a unique one you have never used elsewhere.",
         )
     existing = db.query(User).filter(User.email == body.email.lower()).first()
     if existing:
@@ -109,7 +128,65 @@ def login(body: LoginRequest, response: Response, db: Session = Depends(get_db))
     user.failed_logins = 0
     user.locked_until = None
     db.commit()
+    if user.totp_enabled and user.totp_secret:
+        challenge = create_token(user.email, "mfa", timedelta(minutes=5))
+        return TokenResponse(mfa_required=True, challenge=challenge)
     return _issue(user, response)
+
+
+@router.post("/login/mfa", response_model=TokenResponse)
+def login_mfa(body: MfaLoginRequest, response: Response, db: Session = Depends(get_db)):
+    email = decode_token(body.challenge, expected_type="mfa")
+    if email is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign-in challenge expired. Log in again.")
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Two-factor sign-in is not active for this account.")
+    if not totp.verify(user.totp_secret, body.code):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid authentication code.")
+    return _issue(user, response)
+
+
+@router.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {
+        "email": user.email,
+        "plan": user.plan or "free",
+        "totp_enabled": bool(user.totp_enabled),
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
+
+
+@router.post("/mfa/setup")
+def mfa_setup(body: MfaSetupRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid password.")
+    new_secret = totp.generate_secret()
+    user.totp_secret = new_secret
+    user.totp_enabled = False  # activates only after a confirmed code
+    db.commit()
+    return {"secret": new_secret, "otpauth_uri": totp.provisioning_uri(new_secret, user.email)}
+
+
+@router.post("/mfa/confirm")
+def mfa_confirm(body: MfaConfirmRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.totp_secret or not totp.verify(user.totp_secret, body.code):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That code did not match. Check your authenticator app and try again.")
+    user.totp_enabled = True
+    db.commit()
+    return {"totp_enabled": True}
+
+
+@router.post("/mfa/disable")
+def mfa_disable(body: MfaDisableRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid password.")
+    if not user.totp_secret or not totp.verify(user.totp_secret, body.code):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That code did not match.")
+    user.totp_secret = None
+    user.totp_enabled = False
+    db.commit()
+    return {"totp_enabled": False}
 
 
 @router.post("/refresh", response_model=TokenResponse)

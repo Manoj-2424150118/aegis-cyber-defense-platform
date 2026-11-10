@@ -139,6 +139,11 @@ if _STATIC_DIR.is_dir():
         candidate = _STATIC_DIR / path
         if path and candidate.is_file():
             return FileResponse(candidate)
+        # Prerendered content pages (tools/guides/policies) ship as
+        # <route>.html or <route>/index.html — serve them at clean URLs.
+        for alt in (_STATIC_DIR / f"{path}.html", candidate / "index.html"):
+            if path and alt.is_file():
+                return FileResponse(alt)
         index = _STATIC_DIR / "index.html"
         if index.is_file():
             return FileResponse(index)
