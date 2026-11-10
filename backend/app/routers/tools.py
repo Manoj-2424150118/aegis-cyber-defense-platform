@@ -34,6 +34,7 @@ from app.modules import (
     web_audit,
 )
 from app.modules.detection import enrich_meta
+from app.quota import scan_quota
 from app.rate_limit import client_ip
 from app.schemas import (
     DomainRequest,
@@ -50,8 +51,6 @@ from app.schemas import (
 from app.validation import host_from_url, is_valid_domain, is_valid_host
 
 logger = logging.getLogger("aegis.tools")
-
-from app.quota import scan_quota
 
 router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(scan_quota)])
 

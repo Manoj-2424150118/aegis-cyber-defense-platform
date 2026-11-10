@@ -2,8 +2,6 @@
 
 import time
 
-import pytest
-
 from app.config import settings
 from app.modules import totp as totp_mod
 

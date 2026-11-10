@@ -134,3 +134,10 @@ were already closed in v1.8.1; this release is the detection work itself:
   residual unchanged from v1.8.1, legacy verdict vocabulary kept beside the new 5-band field.
 - Gate: 186 pytest (169 + 17 new golden/adversarial/determinism/redaction), ruff clean,
   bandit no medium/high severity. Live-verified on production (health reports 2.0.0).
+
+## v2.1.0 addendum — freemium, MFA, consent/ads infrastructure, SEO pages (10 Nov 2026)
+- Backend: `users.plan` (+ startup migration), HMAC-keyed daily scan quotas (anon 10 / account 50, Pro unlimited; raw IPs never stored), free vault cap 20, free history 30 days, HIBP breach refusal at signup, opt-in TOTP MFA (setup → confirm → challenge login → disable), GET /api/auth/me.
+- Frontend: pricing section + /pricing page, consent banner (first-party default; footer Privacy choices reopens), two labelled sandboxed house-ad slots (first-party creatives only), vault account-security block (plan, item count, MFA management, login challenge form).
+- SEO: generator `frontend/scripts/build_pages.py` → 11 tool pages, 3 guides, pricing, 4 policies; unique title/meta/canonical + WebApplication/FAQ/Breadcrumb JSON-LD; sitemap 20 URLs; SPA server resolves clean URLs to prerendered HTML.
+- Gate: 198 pytest passed (12 new), ruff clean, bandit no medium/high, frontend build clean.
+- Staged (documented in docs/FREEMIUM.md): real billing (needs owner's Razorpay/Stripe account), third-party ad networks (consent path ready), client-side vault crypto migration (needs owner's go-ahead — touches live vault data), WebAuthn.
