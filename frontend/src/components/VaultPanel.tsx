@@ -29,6 +29,13 @@ export function VaultPanel() {
   const [opened, setOpened] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [mfaChallenge, setMfaChallenge] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [account, setAccount] = useState<{ plan: string; totp_enabled: boolean } | null>(null);
+  const [mfaPending, setMfaPending] = useState("");
+  const [mfaMgmtPw, setMfaMgmtPw] = useState("");
+  const [mfaMgmtCode, setMfaMgmtCode] = useState("");
+  const [mfaMsg, setMfaMsg] = useState("");
 
   function endSession(notice = true) {
     setMode("login");
@@ -82,9 +89,60 @@ export function VaultPanel() {
     setBusy(true);
     try {
       const r = mode === "login" ? await api.login(email, password) : await api.register(email, password);
+      if (r.mfa_required && r.challenge) { setMfaChallenge(r.challenge); setMfaCode(""); return; }
       setToken(r.access_token);
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); }
     finally { setBusy(false); }
+  }
+
+  async function submitMfa(e: React.FormEvent) {
+    e.preventDefault(); setError("");
+    setBusy(true);
+    try {
+      const r = await api.loginMfa(mfaChallenge, mfaCode);
+      setMfaChallenge("");
+      setToken(r.access_token);
+    } catch (err) { setError(err instanceof Error ? err.message : "Invalid code"); }
+    finally { setBusy(false); }
+  }
+
+  useEffect(() => {
+    if (!token) { setAccount(null); return; }
+    let cancelled = false;
+    void (async () => {
+      try { const me = await api.me(token); if (!cancelled) setAccount({ plan: me.plan, totp_enabled: me.totp_enabled }); }
+      catch { /* account extras are best-effort */ }
+    })();
+    return () => { cancelled = true; };
+  }, [token]);
+
+  async function mfaSetupStart() {
+    setMfaMsg(""); setError("");
+    try {
+      const r = await api.mfaSetup(token, mfaMgmtPw);
+      setMfaPending(r.secret);
+      setMfaMsg("Add this secret to your authenticator app (or scan via the otpauth link in your app), then enter a code to confirm.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Setup failed"); }
+  }
+
+  async function mfaConfirm() {
+    setMfaMsg(""); setError("");
+    try {
+      await api.mfaConfirm(token, mfaMgmtCode);
+      setMfaPending(""); setMfaMgmtCode(""); setMfaMgmtPw("");
+      setAccount((a) => (a ? { ...a, totp_enabled: true } : a));
+      setMfaMsg("Two-factor authentication is on. You will be asked for a code at each login.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Confirmation failed"); }
+  }
+
+  async function mfaDisable() {
+    setMfaMsg(""); setError("");
+    try {
+      await api.mfaDisable(token, mfaMgmtPw, mfaMgmtCode);
+      setMfaMgmtCode(""); setMfaMgmtPw("");
+      setAccount((a) => (a ? { ...a, totp_enabled: false } : a));
+      setMfaMsg("Two-factor authentication is off.");
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not disable"); }
   }
 
   async function add(e: React.FormEvent) {
@@ -137,6 +195,16 @@ export function VaultPanel() {
           <span className="tag">Vault</span>
         </div>
         <p className="hint">Recovery codes, PINs and notes, encrypted with AES-256-GCM. The server only ever sees ciphertext.</p>
+        {mfaChallenge ? (
+        <form onSubmit={submitMfa} className="stack">
+          <div className="field">
+            <span id="v-mfa-label">Authenticator code</span>
+            <input value={mfaCode} onChange={(e) => setMfaCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" autoComplete="one-time-code" required aria-labelledby="v-mfa-label" />
+          </div>
+          <button disabled={busy}>{busy ? <><Spinner /> Verifying…</> : "Verify and log in"}</button>
+          <button type="button" className="linklike" onClick={() => setMfaChallenge("")}>Back to login</button>
+        </form>
+        ) : (
         <form onSubmit={auth} className="stack">
           <div className="field">
             <span id="v-email-label">Email</span>
@@ -151,6 +219,7 @@ export function VaultPanel() {
             {mode === "login" ? "New here? Create an account" : "Already registered? Log in"}
           </button>
         </form>
+        )}
         <ErrorNote error={error} />
       </section>
     );
@@ -187,6 +256,47 @@ export function VaultPanel() {
         ))}
       </ul>
       {opened && <p className="generated">Decrypted: <code>{opened}</code></p>}
+      <div className="account-box">
+        <h3>Account security</h3>
+        <p className="meta">
+          Plan: {account?.plan === "pro" ? "Pro" : "Free account"}
+          {account?.plan !== "pro" && <> · Vault {items.length}/20 items</>}
+          {" "}· Two-factor: {account?.totp_enabled ? "on" : "off"}
+        </p>
+        {!account?.totp_enabled && !mfaPending && (
+          <div className="stack">
+            <div className="field">
+              <span id="v-mfapw-label">Account password</span>
+              <PasswordInput value={mfaMgmtPw} onChange={setMfaMgmtPw} placeholder="Confirm it's you" ariaLabel="Account password" />
+            </div>
+            <button type="button" className="secondary" onClick={() => void mfaSetupStart()}>Set up two-factor (TOTP)</button>
+          </div>
+        )}
+        {mfaPending && (
+          <div className="stack">
+            <p className="meta">Secret: <code>{mfaPending}</code></p>
+            <div className="field">
+              <span id="v-mfacode-label">Code from your app</span>
+              <input value={mfaMgmtCode} onChange={(e) => setMfaMgmtCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" aria-labelledby="v-mfacode-label" />
+            </div>
+            <button type="button" onClick={() => void mfaConfirm()}>Confirm and enable</button>
+          </div>
+        )}
+        {account?.totp_enabled && (
+          <div className="stack">
+            <div className="field">
+              <span id="v-mfapw2-label">Account password</span>
+              <PasswordInput value={mfaMgmtPw} onChange={setMfaMgmtPw} placeholder="Confirm it's you" ariaLabel="Account password" />
+            </div>
+            <div className="field">
+              <span id="v-mfacode2-label">Current code</span>
+              <input value={mfaMgmtCode} onChange={(e) => setMfaMgmtCode(e.target.value)} placeholder="6-digit code" inputMode="numeric" aria-labelledby="v-mfacode2-label" />
+            </div>
+            <button type="button" className="secondary" onClick={() => void mfaDisable()}>Turn off two-factor</button>
+          </div>
+        )}
+        {mfaMsg && <p className="meta">{mfaMsg}</p>}
+      </div>
       <button className="linklike" onClick={() => void logout()}>Log out</button>
     </section>
   );

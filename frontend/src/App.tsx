@@ -200,6 +200,57 @@ function TrendingSection() {
   );
 }
 
+/* First-party sponsored slot: a reserved, labelled frame so layout
+ * never shifts. Creatives are same-origin static pages in a sandboxed
+ * iframe — no third-party scripts, no trackers (see /ad-policy). */
+function HouseAd({ variant }: { variant?: "sponsor" }) {
+  return (
+    <aside className="ad-slot" aria-label="Sponsored">
+      <p className="ad-label">Sponsored</p>
+      <iframe
+        className="ad-frame"
+        src={variant === "sponsor" ? "/ads/house.html#sponsor" : "/ads/house.html"}
+        title="Sponsored message"
+        loading="lazy"
+        sandbox="allow-popups"
+      />
+    </aside>
+  );
+}
+
+/* Consent: Aegis runs first-party, non-tracking messages only. Any
+ * future third-party advertising or analytics loads solely with the
+ * visitor's stored consent; the choice can be changed anytime from
+ * "Privacy choices" in the footer. */
+function ConsentBanner() {
+  const [visible, setVisible] = useState<boolean>(() => {
+    try { return !window.localStorage.getItem("aegis-consent"); } catch { return false; }
+  });
+  useEffect(() => {
+    const open = () => setVisible(true);
+    window.addEventListener("aegis:open-consent", open);
+    return () => window.removeEventListener("aegis:open-consent", open);
+  }, []);
+  if (!visible) return null;
+  const choose = (value: string) => {
+    try { window.localStorage.setItem("aegis-consent", value); } catch { /* private mode */ }
+    setVisible(false);
+  };
+  return (
+    <div className="consent-banner" role="dialog" aria-label="Privacy choices">
+      <p>
+        Aegis shows only first-party, non-tracking messages. If third-party advertising or
+        analytics is ever added, it will load only with your consent — decide now or anytime
+        from Privacy choices in the footer.
+      </p>
+      <div className="consent-actions">
+        <button onClick={() => choose("third-party-allowed")}>Allow if added later</button>
+        <button className="secondary" onClick={() => choose("first-party-only")}>First-party only</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [heroText, setHeroText] = useState("");
   const [smart, setSmart] = useState<SmartScanResult | null>(null);
@@ -448,6 +499,8 @@ export default function App() {
 
           <TrendingSection />
 
+          <HouseAd />
+
           <section id="how" className="section reveal">
             <p className="eyebrow">How it works</p>
             <h2 className="section-title">The same flow, every tool</h2>
@@ -507,6 +560,49 @@ export default function App() {
             </div>
           </section>
 
+          <section id="pricing" className="section reveal">
+            <p className="eyebrow">Pricing</p>
+            <h2 className="section-title">Free to check. Fair to upgrade.</h2>
+            <p className="section-sub">Everyday checks stay free. A free account adds history, the vault and a higher daily limit; Pro — launching soon — adds monitoring, bulk scans and API access.</p>
+            <div className="pricing-grid">
+              <div className="pricing-card">
+                <h3>Anonymous</h3>
+                <p className="price">₹0</p>
+                <ul>
+                  <li>All ten tools, no sign-up</li>
+                  <li>10 checks per day</li>
+                  <li>Labelled first-party sponsored slots</li>
+                </ul>
+                <a className="btn ghost" href="#tools">Start checking</a>
+              </div>
+              <div className="pricing-card">
+                <h3>Free account</h3>
+                <p className="price">₹0</p>
+                <ul>
+                  <li>50 checks per day</li>
+                  <li>30 days of scan history</li>
+                  <li>Encrypted vault, 20 items</li>
+                  <li>Optional two-factor login</li>
+                </ul>
+                <a className="btn ghost" href="#tool-vault">Create free account</a>
+              </div>
+              <div className="pricing-card">
+                <h3>Pro</h3>
+                <p className="price">Launching soon</p>
+                <ul>
+                  <li>Unlimited and bulk scanning</li>
+                  <li>Domain monitoring with alerts</li>
+                  <li>API access with keys</li>
+                  <li>No sponsored slots, priority support</li>
+                </ul>
+                <button className="btn ghost" disabled aria-disabled="true">Not on sale yet</button>
+              </div>
+            </div>
+            <p className="section-sub" style={{ marginTop: 16 }}>
+              Full comparison on the <a href="/pricing">pricing page</a>. No checkout, no pre-orders, no fake countdowns — Pro will be announced to free accounts first.
+            </p>
+          </section>
+
           <section id="faq" className="section reveal">
             <p className="eyebrow">FAQ</p>
             <h2 className="section-title">Questions</h2>
@@ -520,6 +616,8 @@ export default function App() {
               ))}
             </div>
           </section>
+
+          <HouseAd variant="sponsor" />
 
           <section className="oss-band reveal">
             <p>
@@ -560,6 +658,11 @@ export default function App() {
                 <li><a href={`${REPO}/blob/main/SECURITY.md`} target="_blank" rel="noopener noreferrer">Security policy</a></li>
                 <li><a href="/.well-known/security.txt">security.txt</a></li>
                 <li><a href="#privacy">Privacy &amp; data</a></li>
+                <li><a href="/privacy">Privacy policy</a></li>
+                <li><a href="/terms">Terms</a></li>
+                <li><a href="/ad-policy">Ad policy</a></li>
+                <li><a href="/pricing">Pricing</a></li>
+                <li><button type="button" className="linklike" onClick={() => window.dispatchEvent(new Event("aegis:open-consent"))}>Privacy choices</button></li>
                 <li><a href="#faq">FAQ</a></li>
               </ul>
             </div>
@@ -572,6 +675,7 @@ export default function App() {
             </span>
           </div>
         </footer>
+        <ConsentBanner />
       </div>
     </div>
   );

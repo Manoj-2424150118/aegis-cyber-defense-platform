@@ -260,6 +260,13 @@ export interface Trending {
   top_patterns: { code: string; label: string; count: number }[];
 }
 
+export interface AuthTokens {
+  access_token: string;
+  refresh_token?: string;
+  mfa_required?: boolean;
+  challenge?: string;
+}
+
 export const api = {
   smartScan: (text: string) =>
     post<SmartScanResult>("/api/tools/smart-scan", { text }),
@@ -345,9 +352,29 @@ export const api = {
     }>("/api/tools/file/stream", form, h);
   },
   register: (email: string, password: string) =>
-    post<{ access_token: string }>("/api/auth/register", { email, password }, undefined, false),
+    post<AuthTokens>("/api/auth/register", { email, password }, undefined, false),
   login: (email: string, password: string) =>
-    post<{ access_token: string }>("/api/auth/login", { email, password }, undefined, false),
+    post<AuthTokens>("/api/auth/login", { email, password }, undefined, false),
+  loginMfa: (challenge: string, code: string) =>
+    post<AuthTokens>("/api/auth/login/mfa", { challenge, code }, undefined, false),
+  async me(token: string): Promise<{ email: string; plan: string; totp_enabled: boolean }> {
+    const res = await fetchWithTimeout(
+      `${BASE}/api/auth/me`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      { timeoutMs: REQUEST_TIMEOUT_MS, retryColdStart: true },
+    );
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { detail?: unknown };
+      throw new Error(detailToMessage(data.detail, res.status));
+    }
+    return (await res.json()) as { email: string; plan: string; totp_enabled: boolean };
+  },
+  mfaSetup: (token: string, password: string) =>
+    post<Record<string, string>>("/api/auth/mfa/setup", { password }, token, false),
+  mfaConfirm: (token: string, code: string) =>
+    post<{ totp_enabled: boolean }>("/api/auth/mfa/confirm", { code }, token, false),
+  mfaDisable: (token: string, password: string, code: string) =>
+    post<{ totp_enabled: boolean }>("/api/auth/mfa/disable", { password, code }, token, false),
   /* Session restore: the refresh token is an HttpOnly cookie (never in
    * web storage, so XSS cannot read it); this call trades it for a
    * fresh in-memory access token. The custom header is required by the
