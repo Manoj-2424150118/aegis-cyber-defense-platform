@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { ErrorNote, PasswordInput } from "./Shared";
+import { ErrorNote, PasswordInput, Spinner } from "./Shared";
 import { LockIcon } from "./icons";
 
 /* Session model: the access token lives only in page memory and the
@@ -141,7 +141,7 @@ export function VaultPanel() {
             <span id="v-pass-label">Account password</span>
             <PasswordInput value={password} onChange={setPassword} placeholder="12+ characters" ariaLabel="Account password" autoComplete={mode === "login" ? "current-password" : "new-password"} required />
           </div>
-          <button>{mode === "login" ? "Log in" : "Create account"}</button>
+          <button disabled={busy}>{busy ? <><Spinner /> Working…</> : mode === "login" ? "Log in" : "Create account"}</button>
           <button type="button" className="linklike" onClick={() => setMode(mode === "login" ? "register" : "login")}>
             {mode === "login" ? "New here? Create an account" : "Already registered? Log in"}
           </button>
@@ -172,7 +172,7 @@ export function VaultPanel() {
           <span id="v-master-label">Master password</span>
           <PasswordInput value={master} onChange={setMaster} placeholder="12+ characters" ariaLabel="Master password" required />
         </div>
-        <button>Add encrypted item</button>
+        <button disabled={busy}>{busy ? <><Spinner /> Encrypting…</> : "Add encrypted item"}</button>
       </form>
       <ErrorNote error={error} />
       <p className="meta">Demo note: don't keep real secrets here.</p>
