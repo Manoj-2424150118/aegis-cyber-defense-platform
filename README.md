@@ -196,7 +196,7 @@ Every tool also has a `/stream` variant that returns the same result over Server
 ## Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 161 tests: engines, crypto, API, lockout, headers,
+cd backend && pytest -q --cov=app     # 169 tests: engines, crypto, API, lockout, headers,
                                        # streaming parity, remediation, validation,
                                        # trackers, redirect tracer, trends, smart scan
 cd frontend && npm run build           # strict TypeScript + production build
@@ -223,7 +223,7 @@ The platform has also been through a dedicated hardening pass and an isolated-sa
 │   │   │   ├── message_analyzer.py  domain_checker.py  tls_inspector.py
 │   │   │   ├── redirect_tracer.py   smart_scan.py      remediation.py
 │   │   └── routers/           # auth.py · tools.py · vault_router.py
-│   ├── tests/                 # 161 pytest tests
+│   ├── tests/                 # 169 pytest tests
 │   ├── Dockerfile · requirements*.txt · .env.example
 ├── frontend/                  # React 19 + TypeScript + Vite
 │   ├── src/components/        # one component per protection tool
