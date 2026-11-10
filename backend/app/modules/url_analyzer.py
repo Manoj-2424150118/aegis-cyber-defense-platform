@@ -20,6 +20,7 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urlparse, urlunparse
 
+from app.modules.detection import enrich
 from app.modules.remediation import fix_for
 
 SUSPICIOUS_TLDS = {"zip", "mov", "top", "xyz", "click", "loan", "men", "gq", "cf", "tk", "ml", "work", "party", "review", "science", "trade", "date", "faith", "accountant", "download", "racing", "win", "vip", "best", "live"}
@@ -86,13 +87,14 @@ class UrlReport:
     findings: list[dict] = field(default_factory=list)
     trackers: list[dict] = field(default_factory=list)
     cleaned_url: str | None = None
+    duration_ms: int = 0
 
     def as_dict(self) -> dict:
-        return {
+        return enrich({
             "url": self.url, "risk_score": self.risk_score,
             "verdict": self.verdict, "findings": self.findings,
             "trackers": self.trackers, "cleaned_url": self.cleaned_url,
-        }
+        }, "url", duration_ms=self.duration_ms)
 
 
 def _verdict(score: int) -> str:
@@ -285,6 +287,8 @@ def iter_url_stages(raw_url: str):
 
 
 def analyze_url(raw_url: str) -> UrlReport:
+    import time
+    started = time.perf_counter()
     gen = iter_url_stages(raw_url)
     ctx = None
     while True:
@@ -298,7 +302,8 @@ def analyze_url(raw_url: str) -> UrlReport:
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No phishing or malware-delivery signals detected.", "fix": fix_for("clean")})
     return UrlReport(url=raw_url, risk_score=score, verdict=_verdict(score), findings=findings,
-                     trackers=ctx.trackers, cleaned_url=ctx.cleaned_url)
+                     trackers=ctx.trackers, cleaned_url=ctx.cleaned_url,
+                     duration_ms=int((time.perf_counter() - started) * 1000))
 
 
 def impersonated_brand(raw_url: str) -> str | None:

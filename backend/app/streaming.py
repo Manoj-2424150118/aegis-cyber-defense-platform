@@ -14,6 +14,7 @@ import asyncio
 import json
 
 from app.modules import domain_checker, tls_inspector, web_audit
+from app.modules.detection import enrich_meta
 from app.modules.email_analyzer import analyze_email, iter_email_stages
 from app.modules.file_scanner import iter_file_stages, scan_file
 from app.modules.message_analyzer import (
@@ -86,9 +87,9 @@ async def stream_domain(domain: str):
                     "findings": new_findings, "running_score": running})
         await asyncio.sleep(PACING_SECONDS)
     score = min(ctx.score, 100)
-    yield _sse({"type": "result", "result": {"domain": domain, "score": score,
-                                             "grade": domain_checker.grade_for(score),
-                                             "findings": ctx.findings}})
+    yield _sse({"type": "result", "result": enrich_meta(
+        {"domain": domain, "score": score, "grade": domain_checker.grade_for(score),
+         "findings": ctx.findings}, "domain", sources_used=("dns",))})
 
 
 async def stream_tls(host: str):
@@ -111,7 +112,7 @@ async def stream_tls(host: str):
     await asyncio.sleep(PACING_SECONDS)
     yield _sse({"type": "step", "index": 3, "label": "Grading chain, hostname & expiry", "status": "done",
                 "findings": report["findings"], "running_score": report["score"]})
-    yield _sse({"type": "result", "result": report})
+    yield _sse({"type": "result", "result": enrich_meta(report, "tls", sources_used=("tls-handshake",))})
 
 
 async def stream_file(filename: str, data: bytes):
@@ -184,4 +185,4 @@ async def stream_web_audit(raw_url: str):
     await asyncio.sleep(PACING_SECONDS)
     yield _sse({"type": "step", "index": 4, "label": "Grading cookies & information leakage", "status": "done",
                 "findings": cookie_findings, "running_score": report["score"]})
-    yield _sse({"type": "result", "result": report})
+    yield _sse({"type": "result", "result": enrich_meta(report, "web-audit", sources_used=("http-fetch",))})

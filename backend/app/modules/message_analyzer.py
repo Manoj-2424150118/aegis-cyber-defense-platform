@@ -12,6 +12,7 @@ sounding" text carrying a malicious link is still caught.
 
 import re
 
+from app.modules.detection import enrich
 from app.modules.remediation import fix_for
 from app.modules.url_analyzer import analyze_url
 
@@ -135,6 +136,8 @@ def iter_message_stages(text: str):
 
 
 def analyze_message(text: str) -> dict:
+    import time
+    started = time.perf_counter()
     gen = iter_message_stages(text)
     ctx = None
     while True:
@@ -147,4 +150,5 @@ def analyze_message(text: str) -> dict:
     findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No known scam patterns detected in this message.", "fix": fix_for("clean")})
-    return {"risk_score": score, "verdict": _verdict(score), "findings": findings, "links_found": ctx.links}
+    return enrich({"risk_score": score, "verdict": _verdict(score), "findings": findings, "links_found": ctx.links},
+                  "message", duration_ms=int((time.perf_counter() - started) * 1000))

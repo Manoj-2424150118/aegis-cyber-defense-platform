@@ -14,6 +14,7 @@ import math
 import re
 import zipfile
 
+from app.modules.detection import enrich
 from app.modules.remediation import fix_for
 
 EICAR_SIGNATURE = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
@@ -164,6 +165,8 @@ def iter_file_stages(filename: str, data: bytes):
 
 def scan_file(filename: str, data: bytes) -> dict:
     """Analyse bytes WITHOUT executing them; nothing is written to disk."""
+    import time
+    started = time.perf_counter()
     gen = iter_file_stages(filename, data)
     ctx = None
     while True:
@@ -177,7 +180,7 @@ def scan_file(filename: str, data: bytes) -> dict:
     findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No static malware indicators found. This is not a guarantee — keep antivirus on.", "fix": fix_for("clean")})
-    return {
+    result = {
         "filename": filename, "size_bytes": len(ctx.data), "detected_type": ctx.detected_type,
         # SHA-1/MD5 are reported only as threat-intel fingerprints, never for security.
         "sha256": hashlib.sha256(ctx.data).hexdigest(),
@@ -186,3 +189,4 @@ def scan_file(filename: str, data: bytes) -> dict:
         "entropy": round(ctx.entropy, 2),
         "risk_score": score, "verdict": verdict, "findings": findings, "ioc_hits": ctx.hits,
     }
+    return enrich(result, "file", duration_ms=int((time.perf_counter() - started) * 1000))

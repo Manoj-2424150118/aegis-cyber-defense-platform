@@ -10,6 +10,7 @@ behind Business Email Compromise (BEC).
 import re
 from urllib.parse import urlparse
 
+from app.modules.detection import enrich
 from app.modules.remediation import fix_for
 from app.modules.url_analyzer import analyze_url
 
@@ -172,6 +173,8 @@ def iter_email_stages(raw_headers: str, body: str = ""):
 
 
 def analyze_email(raw_headers: str, body: str = "") -> dict:
+    import time
+    started = time.perf_counter()
     gen = iter_email_stages(raw_headers, body)
     ctx = None
     while True:
@@ -185,4 +188,5 @@ def analyze_email(raw_headers: str, body: str = "") -> dict:
     findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No phishing signals detected in headers or content.", "fix": fix_for("clean")})
-    return {"risk_score": score, "verdict": verdict, "from_domain": ctx.from_domain, "findings": findings}
+    return enrich({"risk_score": score, "verdict": verdict, "from_domain": ctx.from_domain, "findings": findings},
+                  "email", duration_ms=int((time.perf_counter() - started) * 1000))

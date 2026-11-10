@@ -32,6 +32,7 @@ from app.modules import (
     url_analyzer,
     web_audit,
 )
+from app.modules.detection import enrich_meta
 from app.rate_limit import client_ip
 from app.schemas import (
     DomainRequest,
@@ -213,7 +214,10 @@ async def audit(body: WebAuditRequest):
         # Run it in the threadpool: calling it inline would freeze the
         # event loop — and an audit of THIS service would deadlock
         # against itself until timeout.
-        return await run_in_threadpool(web_audit.audit_website, body.url)
+        started = _time.perf_counter()
+        result = await run_in_threadpool(web_audit.audit_website, body.url)
+        return enrich_meta(result, "web-audit", duration_ms=int((_time.perf_counter() - started) * 1000),
+                           sources_used=("http-fetch",))
     except ValueError as exc:
         # SSRF guard and scheme validation land here — a clean 400, never a 500.
         raise HTTPException(400, str(exc)) from None
@@ -243,7 +247,10 @@ def _checked_domain(raw: str) -> str:
 async def check_domain(body: DomainRequest):
     domain = _checked_domain(body.domain)
     # DNS lookups block; keep them off the event loop.
-    return await run_in_threadpool(domain_checker.check_domain, domain)
+    started = _time.perf_counter()
+    result = await run_in_threadpool(domain_checker.check_domain, domain)
+    return enrich_meta(result, "domain", duration_ms=int((_time.perf_counter() - started) * 1000),
+                       sources_used=("dns",))
 
 
 @router.post("/tls")
@@ -253,7 +260,10 @@ async def check_tls(body: TlsRequest):
         raise HTTPException(400, "That doesn't look like a valid domain name or IP address.")
     try:
         # TLS handshakes block; run in the threadpool like the audit.
-        return await run_in_threadpool(tls_inspector.inspect_tls, host)
+        started = _time.perf_counter()
+        result = await run_in_threadpool(tls_inspector.inspect_tls, host)
+        return enrich_meta(result, "tls", duration_ms=int((_time.perf_counter() - started) * 1000),
+                           sources_used=("tls-handshake",))
     except ValueError as exc:
         # SSRF guard (non-public hosts) — a clean 400, never a 500.
         raise HTTPException(400, str(exc)) from None
@@ -268,6 +278,8 @@ async def smart_scan_endpoint(body: SmartScanRequest, request: Request):
     if not body.text.strip():
         raise HTTPException(400, "Paste a link, an email or a message to check.")
     envelope = smart_scan.smart_scan(body.text)
+    envelope.setdefault("meta", {"schema_version": "2.0", "engine": "smart-scan",
+                                 "sources_used": [envelope["detected_type"]], "degraded": False, "cached": False})
     result = envelope["result"]
     codes = [f["code"] for f in result["findings"]]
     if envelope["detected_type"] == "url":
