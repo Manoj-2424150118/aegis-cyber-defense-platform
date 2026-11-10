@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free Website Security Audit — Headers, Cookies &amp; HTTPS Grade | Aegis</title>
+<meta name="description" content="Grade a website&#x27;s security configuration: HTTPS enforcement, security headers, cookie flags and mixed content. Free, one URL." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/tools/website-security-audit" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Free Website Security Audit — Headers, Cookies &amp; HTTPS Grade | Aegis" />
+<meta property="og:description" content="Grade a website&#x27;s security configuration: HTTPS enforcement, security headers, cookie flags and mixed content. Free, one URL." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/tools/website-security-audit" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Aegis Website Safety Audit", "url": "https://aegis-cyber-defense-platform.onrender.com/tools/website-security-audit", "applicationCategory": "SecurityApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Grade a website's security configuration: HTTPS enforcement, security headers, cookie flags and mixed content. Free, one URL."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Can I audit a site I don't own?", "acceptedAnswer": {"@type": "Answer", "text": "Yes \u2014 this reads only the public response headers any browser receives. It is the same information security scanners and the sites' own users can see."}}, {"@type": "Question", "name": "Why does this site grade itself?", "acceptedAnswer": {"@type": "Answer", "text": "Aegis eats its own cooking: the platform serves the headers this audit recommends, under a strict CSP with no inline scripts."}}, {"@type": "Question", "name": "What grade should I aim for?", "acceptedAnswer": {"@type": "Answer", "text": "A or A\u2212 is achievable for most sites in an afternoon of header work; the audit lists fixes in impact order."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Aegis", "item": "https://aegis-cyber-defense-platform.onrender.com/"}, {"@type": "ListItem", "position": 2, "name": "Tools", "item": "https://aegis-cyber-defense-platform.onrender.com/#tools"}, {"@type": "ListItem", "position": 3, "name": "Website Safety Audit", "item": "https://aegis-cyber-defense-platform.onrender.com/tools/website-security-audit"}]}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Free tool</p>
+<h1>Website Safety Audit</h1>
+
+<p class="lede">For site owners and the cautious alike: enter a URL and get a graded audit of the security configuration browsers actually enforce — HTTPS, HSTS, CSP, cookie flags and the headers that decide how exploitable common bugs are.</p>
+<a class="cta" href="/#tool-web">Run the free check</a>
+<p class="note">Free, no sign-up. Nothing you paste is stored unless you create an account and save it yourself.</p>
+<h2>What it checks</h2>
+<ul><li>HTTPS availability and redirect enforcement, HSTS presence and strength</li><li>Content-Security-Policy, X-Frame-Options / frame-ancestors, nosniff, Referrer-Policy, Permissions-Policy</li><li>Cookie flags: Secure, HttpOnly, SameSite on session-like cookies</li><li>Mixed content and server/version disclosure headers</li><li>Each missing control with the exact header to add</li></ul>
+<h2>How it works</h2>
+<p>Aegis fetches the page headers with its guarded fetcher and grades against the same checklist it applies to itself (this site scores itself with the same engine). Findings are configuration facts, each with a copy-pasteable fix.</p>
+<h2>What the result means</h2>
+<ul><li>A-grade configuration does not mean the application has no bugs — it means the browser-level safety nets are all in place.</li><li>Missing CSP is the most common gap; it is also the one that turns a small XSS into a full account takeover.</li><li>Cookie flags are one-line fixes with outsized effect on session theft.</li></ul>
+<div class="card"><h2 style="margin-top:12px">Frequently asked questions</h2><details><summary>Can I audit a site I don&#x27;t own?</summary><p>Yes — this reads only the public response headers any browser receives. It is the same information security scanners and the sites&#x27; own users can see.</p></details><details><summary>Why does this site grade itself?</summary><p>Aegis eats its own cooking: the platform serves the headers this audit recommends, under a strict CSP with no inline scripts.</p></details><details><summary>What grade should I aim for?</summary><p>A or A− is achievable for most sites in an afternoon of header work; the audit lists fixes in impact order.</p></details></div>
+<h2>Related tools</h2>
+<div class="related"><a href="/tools/tls-certificate-checker">TLS Certificate Inspector</a><a href="/tools/domain-spoofing-check">Domain Security Checker</a><a href="/tools/phishing-link-checker">Phishing Link Checker</a></div>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

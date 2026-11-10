@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free Redirect Tracer — See Where a Link Really Goes | Aegis</title>
+<meta name="description" content="Trace a link&#x27;s full redirect chain and check the final destination before you visit. Free, SSRF-guarded, with tracker detection. No sign-up." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/tools/redirect-chain-tracer" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Free Redirect Tracer — See Where a Link Really Goes | Aegis" />
+<meta property="og:description" content="Trace a link&#x27;s full redirect chain and check the final destination before you visit. Free, SSRF-guarded, with tracker detection. No sign-up." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/tools/redirect-chain-tracer" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Aegis Redirect Chain Tracer", "url": "https://aegis-cyber-defense-platform.onrender.com/tools/redirect-chain-tracer", "applicationCategory": "SecurityApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Trace a link's full redirect chain and check the final destination before you visit. Free, SSRF-guarded, with tracker detection. No sign-up."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is it safe to trace a malicious link?", "acceptedAnswer": {"@type": "Answer", "text": "Yes \u2014 the fetching happens on Aegis servers with SSRF protections, not in your browser. You see the destination without visiting it."}}, {"@type": "Question", "name": "Why do legitimate emails redirect so much?", "acceptedAnswer": {"@type": "Answer", "text": "Marketing platforms route clicks through their own domains to measure opens and clicks. The tracer separates that normal tracking from chains that end somewhere unexpected."}}, {"@type": "Question", "name": "What is an open redirect?", "acceptedAnswer": {"@type": "Answer", "text": "A trusted site that forwards visitors to any URL given in a parameter. Attackers abuse it so the first hop looks like a brand you trust while the final page is theirs."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Aegis", "item": "https://aegis-cyber-defense-platform.onrender.com/"}, {"@type": "ListItem", "position": 2, "name": "Tools", "item": "https://aegis-cyber-defense-platform.onrender.com/#tools"}, {"@type": "ListItem", "position": 3, "name": "Redirect Chain Tracer", "item": "https://aegis-cyber-defense-platform.onrender.com/tools/redirect-chain-tracer"}]}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Free tool</p>
+<h1>Redirect Chain Tracer</h1>
+
+<p class="lede">Short links and &#x27;you won a prize&#x27; URLs rarely land where they claim. The tracer follows every hop — shortener, tracker, open redirect — and scores the page you would actually end up on.</p>
+<a class="cta" href="/#tool-url">Run the free check</a>
+<p class="note">Free, no sign-up. Nothing you paste is stored unless you create an account and save it yourself.</p>
+<h2>What it checks</h2>
+<ul><li>Every hop in the chain, with status codes and hosts</li><li>Click-tracking parameters (40+ known trackers) and the cleaned, tracker-free link</li><li>Tracking redirect wrappers used by mail and ad platforms</li><li>The final destination, scored with the full phishing-link engine</li><li>Chains that bounce through unrelated or newly registered domains</li></ul>
+<h2>How it works</h2>
+<p>Aegis fetches the chain from its own servers with a guarded fetcher: every hop is re-validated, private and loopback addresses are refused, and only the redirect metadata is kept. Your browser never touches the suspicious site.</p>
+<h2>What the result means</h2>
+<ul><li>A short, same-brand chain ending on the expected domain is normal for marketing mail.</li><li>Long chains crossing unrelated domains, or ending on a look-alike host, are a strong phishing pattern.</li><li>The cleaned link is the same destination with trackers stripped — share that one instead.</li></ul>
+<div class="card"><h2 style="margin-top:12px">Frequently asked questions</h2><details><summary>Is it safe to trace a malicious link?</summary><p>Yes — the fetching happens on Aegis servers with SSRF protections, not in your browser. You see the destination without visiting it.</p></details><details><summary>Why do legitimate emails redirect so much?</summary><p>Marketing platforms route clicks through their own domains to measure opens and clicks. The tracer separates that normal tracking from chains that end somewhere unexpected.</p></details><details><summary>What is an open redirect?</summary><p>A trusted site that forwards visitors to any URL given in a parameter. Attackers abuse it so the first hop looks like a brand you trust while the final page is theirs.</p></details></div>
+<h2>Related tools</h2>
+<div class="related"><a href="/tools/phishing-link-checker">Phishing Link Checker</a><a href="/tools/email-tracking-pixel-checker">Email Tracking Pixel Checker</a><a href="/tools/scam-message-checker">Scam Message Checker</a></div>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

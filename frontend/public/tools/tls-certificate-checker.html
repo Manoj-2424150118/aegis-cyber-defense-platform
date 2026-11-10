@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free TLS/SSL Certificate Checker — Expiry, Chain &amp; Weaknesses | Aegis</title>
+<meta name="description" content="Inspect a site&#x27;s TLS certificate: expiry, issuer, hostname match, chain, protocol versions, weak signatures and key sizes. Free." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/tools/tls-certificate-checker" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Free TLS/SSL Certificate Checker — Expiry, Chain &amp; Weaknesses | Aegis" />
+<meta property="og:description" content="Inspect a site&#x27;s TLS certificate: expiry, issuer, hostname match, chain, protocol versions, weak signatures and key sizes. Free." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/tools/tls-certificate-checker" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Aegis TLS Certificate Inspector", "url": "https://aegis-cyber-defense-platform.onrender.com/tools/tls-certificate-checker", "applicationCategory": "SecurityApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Inspect a site's TLS certificate: expiry, issuer, hostname match, chain, protocol versions, weak signatures and key sizes. Free."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does a padlock mean a site is safe?", "acceptedAnswer": {"@type": "Answer", "text": "It means the connection is encrypted to whoever controls that domain. Scam sites get free certificates in minutes \u2014 pair this check with the link checker."}}, {"@type": "Question", "name": "How often should certificates be checked?", "acceptedAnswer": {"@type": "Answer", "text": "Before expiry, always \u2014 automated monitoring matters because a lapsed cert takes a site down and trains users to click through warnings."}}, {"@type": "Question", "name": "What is TLS 1.3 and should I require it?", "acceptedAnswer": {"@type": "Answer", "text": "The current protocol version: faster and with obsolete cryptography removed. Supporting 1.2 + 1.3 and disabling 1.0/1.1 is the modern baseline."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Aegis", "item": "https://aegis-cyber-defense-platform.onrender.com/"}, {"@type": "ListItem", "position": 2, "name": "Tools", "item": "https://aegis-cyber-defense-platform.onrender.com/#tools"}, {"@type": "ListItem", "position": 3, "name": "TLS Certificate Inspector", "item": "https://aegis-cyber-defense-platform.onrender.com/tools/tls-certificate-checker"}]}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Free tool</p>
+<h1>TLS Certificate Inspector</h1>
+
+<p class="lede">The padlock is a claim; this inspector verifies it. For any host, Aegis completes a real TLS handshake and examines the certificate — who issued it, when it expires, whether the chain and algorithms still meet modern baselines.</p>
+<a class="cta" href="/#tool-tls">Run the free check</a>
+<p class="note">Free, no sign-up. Nothing you paste is stored unless you create an account and save it yourself.</p>
+<h2>What it checks</h2>
+<ul><li>Expiry and days remaining, issuer and subject, hostname coverage (SANs)</li><li>Signature algorithm (SHA-1/MD5 flagged) and key strength (RSA &lt; 2048, EC &lt; 256 flagged)</li><li>Protocol versions offered — TLS 1.0/1.1 are obsolete</li><li>Chain completeness and trust-path problems</li><li>Certificate transparency and revocation-relevant basics</li></ul>
+<h2>How it works</h2>
+<p>A real handshake from Aegis servers, with certificate facts parsed from the DER encoding itself. Detections are facts about the presented certificate, graded against current Mozilla/baseline requirements.</p>
+<h2>What the result means</h2>
+<ul><li>An expired or name-mismatched certificate on a payment page: stop, do not proceed — whatever the site claims.</li><li>Weak signatures and small keys are tomorrow&#x27;s forgery; site owners should reissue on modern profiles.</li><li>A valid certificate proves control of the domain, not honesty — phishing sites have padlocks too.</li></ul>
+<div class="card"><h2 style="margin-top:12px">Frequently asked questions</h2><details><summary>Does a padlock mean a site is safe?</summary><p>It means the connection is encrypted to whoever controls that domain. Scam sites get free certificates in minutes — pair this check with the link checker.</p></details><details><summary>How often should certificates be checked?</summary><p>Before expiry, always — automated monitoring matters because a lapsed cert takes a site down and trains users to click through warnings.</p></details><details><summary>What is TLS 1.3 and should I require it?</summary><p>The current protocol version: faster and with obsolete cryptography removed. Supporting 1.2 + 1.3 and disabling 1.0/1.1 is the modern baseline.</p></details></div>
+<h2>Related tools</h2>
+<div class="related"><a href="/tools/website-security-audit">Website Safety Audit</a><a href="/tools/domain-spoofing-check">Domain Security Checker</a><a href="/tools/phishing-link-checker">Phishing Link Checker</a></div>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

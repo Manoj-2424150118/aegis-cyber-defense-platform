@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free Phishing Link Checker — Is This Link Safe? | Aegis</title>
+<meta name="description" content="Check if a link is safe before you click. Free phishing URL checker analysing host tricks, brand impersonation and scam patterns. No sign-up." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/tools/phishing-link-checker" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Free Phishing Link Checker — Is This Link Safe? | Aegis" />
+<meta property="og:description" content="Check if a link is safe before you click. Free phishing URL checker analysing host tricks, brand impersonation and scam patterns. No sign-up." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/tools/phishing-link-checker" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Aegis Phishing Link Checker", "url": "https://aegis-cyber-defense-platform.onrender.com/tools/phishing-link-checker", "applicationCategory": "SecurityApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Check if a link is safe before you click. Free phishing URL checker analysing host tricks, brand impersonation and scam patterns. No sign-up."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is this link checker really free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Anonymous checks are free with a fair daily limit, and creating a free account raises it. The result of a check you run is never locked behind sign-up."}}, {"@type": "Question", "name": "Do you visit the link to check it?", "acceptedAnswer": {"@type": "Answer", "text": "The basic check analyses the URL text only \u2014 it never fetches the page, so checking a link cannot infect you. The separate Redirect Tracer follows links server-side with an SSRF-guarded fetcher when you ask it to."}}, {"@type": "Question", "name": "Can a checker guarantee a link is safe?", "acceptedAnswer": {"@type": "Answer", "text": "No tool can. Aegis explains the evidence it finds; a brand-new phishing domain with no tricks can score low. Treat a clean score as 'no known tricks', not a guarantee."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Aegis", "item": "https://aegis-cyber-defense-platform.onrender.com/"}, {"@type": "ListItem", "position": 2, "name": "Tools", "item": "https://aegis-cyber-defense-platform.onrender.com/#tools"}, {"@type": "ListItem", "position": 3, "name": "Phishing Link Checker", "item": "https://aegis-cyber-defense-platform.onrender.com/tools/phishing-link-checker"}]}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Free tool</p>
+<h1>Phishing Link Checker</h1>
+
+<p class="lede">Paste any link — from a text, email, QR code or social post — and Aegis dissects it the way a phishing kit builds it: host tricks, look-alike domains, hidden credentials and lure language, scored and explained in plain words.</p>
+<a class="cta" href="/#tool-url">Run the free check</a>
+<p class="note">Free, no sign-up. Nothing you paste is stored unless you create an account and save it yourself.</p>
+<h2>What it checks</h2>
+<ul><li>Look-alike and homograph domains, including mixed-script Unicode hosts (a Cyrillic &#x27;а&#x27; posing as Latin &#x27;a&#x27;)</li><li>Brand names hidden in paths, subdomains and userinfo ( paypal.com@evil-host style tricks)</li><li>Raw IP hosts, embedded username:password credentials, URL shorteners and open redirects</li><li>Abuse-prone free hosting and newly abused top-level domains</li><li>Double-encoded paths, zero-width characters and other normalisation tricks browsers resolve silently</li><li>Phishing and social-engineering lure phrases in the URL itself</li></ul>
+<h2>How it works</h2>
+<p>The checker normalises the URL the same way a browser does (Unicode NFKC, zero-width stripping), then applies deterministic detectors — every point in the score traces to a named signal you can read. Scores combine into a 0–100 risk score with a verdict band from safe to malicious, plus a prevention step for anything it flags.</p>
+<h2>What the result means</h2>
+<ul><li>Safe / likely safe — no meaningful signals; still stay alert if the message itself pressured you.</li><li>Caution / suspicious — one or more real phishing techniques are present; verify through the official app or site, typed by hand.</li><li>Malicious — multiple strong signals agree; do not open it and warn whoever sent it, their account may be compromised.</li></ul>
+<div class="card"><h2 style="margin-top:12px">Frequently asked questions</h2><details><summary>Is this link checker really free?</summary><p>Yes. Anonymous checks are free with a fair daily limit, and creating a free account raises it. The result of a check you run is never locked behind sign-up.</p></details><details><summary>Do you visit the link to check it?</summary><p>The basic check analyses the URL text only — it never fetches the page, so checking a link cannot infect you. The separate Redirect Tracer follows links server-side with an SSRF-guarded fetcher when you ask it to.</p></details><details><summary>Can a checker guarantee a link is safe?</summary><p>No tool can. Aegis explains the evidence it finds; a brand-new phishing domain with no tricks can score low. Treat a clean score as &#x27;no known tricks&#x27;, not a guarantee.</p></details></div>
+<h2>Related tools</h2>
+<div class="related"><a href="/tools/redirect-chain-tracer">Redirect Chain Tracer</a><a href="/tools/scam-message-checker">Scam Message Checker</a><a href="/tools/website-security-audit">Website Safety Audit</a></div>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>

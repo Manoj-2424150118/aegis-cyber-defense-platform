@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Free Phishing Email Checker — Is This Email a Scam? | Aegis</title>
+<meta name="description" content="Analyse a suspicious email&#x27;s headers and content for phishing, CEO fraud and BEC: SPF/DKIM alignment, reply-to tricks, payment diversion. Free." />
+<link rel="canonical" href="https://aegis-cyber-defense-platform.onrender.com/tools/email-phishing-checker" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Free Phishing Email Checker — Is This Email a Scam? | Aegis" />
+<meta property="og:description" content="Analyse a suspicious email&#x27;s headers and content for phishing, CEO fraud and BEC: SPF/DKIM alignment, reply-to tricks, payment diversion. Free." />
+<meta property="og:url" content="https://aegis-cyber-defense-platform.onrender.com/tools/email-phishing-checker" />
+<meta name="theme-color" content="#0A0C0B" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/assets/pages.css" />
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebApplication", "name": "Aegis Phishing Email Analyser", "url": "https://aegis-cyber-defense-platform.onrender.com/tools/email-phishing-checker", "applicationCategory": "SecurityApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "description": "Analyse a suspicious email's headers and content for phishing, CEO fraud and BEC: SPF/DKIM alignment, reply-to tricks, payment diversion. Free."}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I get the full email headers?", "acceptedAnswer": {"@type": "Answer", "text": "In Gmail: open the message, click the three dots, 'Show original'. In Outlook: File \u2192 Properties \u2192 Internet headers. Paste the whole thing, headers and body."}}, {"@type": "Question", "name": "What is CEO fraud / BEC?", "acceptedAnswer": {"@type": "Answer", "text": "Business email compromise: a message impersonating an executive or supplier that asks for a wire transfer, a bank-detail change, or payroll diversion. It is the costliest email crime category reported to the FBI."}}, {"@type": "Question", "name": "Is my email stored?", "acceptedAnswer": {"@type": "Answer", "text": "No. Analysis happens in the request and the content is not saved. Signed-in users can save the result summary to their history \u2014 the email itself is never kept."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Aegis", "item": "https://aegis-cyber-defense-platform.onrender.com/"}, {"@type": "ListItem", "position": 2, "name": "Tools", "item": "https://aegis-cyber-defense-platform.onrender.com/#tools"}, {"@type": "ListItem", "position": 3, "name": "Phishing Email Analyser", "item": "https://aegis-cyber-defense-platform.onrender.com/tools/email-phishing-checker"}]}</script>
+</head>
+<body>
+<header class="site"><div class="wrap">
+<a class="logo" href="/"><svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 2 27 6v8c0 7-4.6 12.4-11 16C9.6 26.4 5 21 5 14V6Z" stroke="var(--accent)" stroke-width="2.4"/><path d="M11.5 21.5 16 10l4.5 11.5M13.2 17.5h5.6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Aegis</a>
+<nav><a href="/#tools">Tools</a><a href="/pricing">Pricing</a><a href="/guides/how-to-check-if-a-link-is-safe">Guides</a></nav>
+</div></header>
+<main><div class="wrap">
+<p class="kicker">Free tool</p>
+<h1>Phishing Email Analyser</h1>
+
+<p class="lede">Paste a full email — headers and body — and Aegis reads it like a mail gateway: authentication results, sender tricks, and the social-engineering patterns behind CEO fraud and invoice scams.</p>
+<a class="cta" href="/#tool-email">Run the free check</a>
+<p class="note">Free, no sign-up. Nothing you paste is stored unless you create an account and save it yourself.</p>
+<h2>What it checks</h2>
+<ul><li>SPF, DKIM and DMARC results in the headers, and whether they align with the visible sender</li><li>From / Reply-To / Return-Path mismatches and Message-ID domain mismatches</li><li>CEO-fraud and BEC patterns: wire-transfer urgency, secrecy, gift cards, payroll and bank-detail changes</li><li>Login forms embedded in the email body and credential-harvesting language</li><li>Missing Received chain and other signs of hand-injected mail</li><li>Hidden text, tracking pixels and mismatched link destinations</li></ul>
+<h2>How it works</h2>
+<p>The analyser parses the RFC 5322 headers and body locally in the request — nothing is stored. Authentication findings are deterministic (they come from the headers themselves); content findings name the exact phrases and structures that fired, so you can judge the evidence yourself.</p>
+<h2>What the result means</h2>
+<ul><li>Failed or misaligned authentication plus a payment request is the classic BEC combination — verify by phone on a known number.</li><li>A clean authentication result does not make an email honest: a compromised real account passes every check. Judge the request, not just the headers.</li><li>Urgency plus secrecy (&#x27;don&#x27;t call, just pay&#x27;) is itself a red flag, whatever the score.</li></ul>
+<div class="card"><h2 style="margin-top:12px">Frequently asked questions</h2><details><summary>How do I get the full email headers?</summary><p>In Gmail: open the message, click the three dots, &#x27;Show original&#x27;. In Outlook: File → Properties → Internet headers. Paste the whole thing, headers and body.</p></details><details><summary>What is CEO fraud / BEC?</summary><p>Business email compromise: a message impersonating an executive or supplier that asks for a wire transfer, a bank-detail change, or payroll diversion. It is the costliest email crime category reported to the FBI.</p></details><details><summary>Is my email stored?</summary><p>No. Analysis happens in the request and the content is not saved. Signed-in users can save the result summary to their history — the email itself is never kept.</p></details></div>
+<h2>Related tools</h2>
+<div class="related"><a href="/tools/domain-spoofing-check">Domain Security Checker</a><a href="/tools/email-tracking-pixel-checker">Email Tracking Pixel Checker</a><a href="/tools/phishing-link-checker">Phishing Link Checker</a></div>
+
+</div></main>
+<footer class="site"><div class="wrap">
+<nav>
+<a href="/">Home</a><a href="/#tools">All tools</a><a href="/pricing">Pricing</a>
+<a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+<a href="/ad-policy">Ad policy</a><a href="/refund-policy">Refund policy</a>
+<a href="/.well-known/security.txt">security.txt</a>
+</nav>
+<p class="note">Aegis — free personal cyber-defense tools. Checks run without sign-up;
+results are guidance, not a guarantee. Last updated 2026-11-10.</p>
+</div></footer>
+</body>
+</html>
