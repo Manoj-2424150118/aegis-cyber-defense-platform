@@ -16,7 +16,19 @@
 
 **Repository:** [github.com/Manoj-2424150118/aegis-cyber-defense-platform](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform)
 
+<p align="center"><img src="docs/demo.gif" alt="Aegis demo — home, the nine tools, and Smart Scan verdicts" width="420"/></p>
+
 ---
+
+## Quickstart
+
+```bash
+git clone https://github.com/Manoj-2424150118/aegis-cyber-defense-platform.git
+cd aegis-cyber-defense-platform
+docker compose up --build      # app on http://localhost:8080 · API docs on :8000/docs
+```
+
+Or skip the install — the [live demo](https://aegis-cyber-defense-platform.onrender.com) runs the full platform. Every option is detailed under [Setup & run](#setup--run).
 
 ## Overview
 
