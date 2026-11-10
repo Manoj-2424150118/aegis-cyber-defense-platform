@@ -3,7 +3,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-os.environ.setdefault("AEGIS_DATABASE_URL", "sqlite://")  # in-memory for tests
+os.environ.setdefault("AEGIS_DATABASE_URL", "sqlite://")
+# Freemium quotas are exercised explicitly in test_freemium_v21 with
+# monkeypatched limits; the rest of the suite must not be throttled.
+os.environ.setdefault("AEGIS_ANON_DAILY_SCAN_LIMIT", "100000")
+os.environ.setdefault("AEGIS_ACCOUNT_DAILY_SCAN_LIMIT", "100000")  # in-memory for tests
 
 import pytest
 from fastapi.testclient import TestClient

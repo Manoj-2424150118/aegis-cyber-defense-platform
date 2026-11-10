@@ -32,6 +32,23 @@ def get_db():
 
 
 def init_db() -> None:
+    from sqlalchemy import inspect, text
+
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    # create_all never alters existing tables, so columns added after a
+    # database was first created (plan / TOTP in v2.1) are added here.
+    # Idempotent; new tables (scan_quota) come from create_all above.
+    inspector = inspect(engine)
+    if "users" in inspector.get_table_names():
+        existing = {c["name"] for c in inspector.get_columns("users")}
+        additions = {
+            "plan": "VARCHAR(16) DEFAULT 'free'",
+            "totp_secret": "VARCHAR(64)",
+            "totp_enabled": "BOOLEAN DEFAULT FALSE",
+        }
+        with engine.begin() as conn:
+            for name, ddl in additions.items():
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))

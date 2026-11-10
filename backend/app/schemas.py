@@ -26,9 +26,31 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
+    access_token: str = ""
+    refresh_token: str = ""
     token_type: str = "bearer"
+    # Set instead of tokens when the account has MFA enabled: the client
+    # completes sign-in via POST /api/auth/login/mfa.
+    mfa_required: bool = False
+    challenge: str = ""
+
+
+class MfaLoginRequest(BaseModel):
+    challenge: str = Field(min_length=10, max_length=4096)
+    code: str = Field(min_length=6, max_length=8)
+
+
+class MfaSetupRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+
+
+class MfaConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=8)
+
+
+class MfaDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=8)
 
 
 class UrlRequest(BaseModel):

@@ -4,6 +4,7 @@ ciphertext keyed by the user's master password (Argon2id-derived)."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db import get_db
 from app.deps import get_current_user
 from app.models import User, VaultItem
@@ -15,6 +16,14 @@ router = APIRouter(prefix="/api/vault", tags=["vault"])
 
 @router.post("", status_code=201)
 def create_item(body: VaultCreateRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if (user.plan or "free") != "pro":
+        count = db.query(VaultItem).filter(VaultItem.user_id == user.id).count()
+        if count >= settings.vault_free_item_limit:
+            raise HTTPException(
+                403,
+                f"Free accounts hold up to {settings.vault_free_item_limit} vault items. "
+                "Delete an item to add another.",
+            )
     salt = vault_crypto.new_salt()
     blob = vault_crypto.encrypt_item(body.master_password, salt, body.secret)
     item = VaultItem(user_id=user.id, title=body.title, ciphertext=blob)

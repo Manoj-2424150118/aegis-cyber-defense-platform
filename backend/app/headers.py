@@ -49,9 +49,25 @@ def cache_control_for(path: str) -> str:
     return "no-cache"
 
 
+# First-party house-ad creatives live under /ads/ and are embedded by the
+# SPA in a sandboxed iframe. They may be framed by this origin only, run
+# no scripts, and load nothing external.
+ADS_CSP = (
+    "default-src 'none'; style-src 'self'; img-src 'self' data:; "
+    "frame-ancestors 'self'; sandbox"
+)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
+        if request.url.path.startswith("/ads/"):
+            response.headers["Content-Security-Policy"] = ADS_CSP
+            response.headers.pop("x-frame-options", None)
+            response.headers["Cache-Control"] = "no-cache"
+            if "server" in response.headers:
+                del response.headers["server"]
+            return response
         for name, value in HEADERS.items():
             if name == "Cache-Control":
                 continue  # set per-surface by cache_control_for below

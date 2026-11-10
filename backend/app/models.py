@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -19,6 +19,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    plan: Mapped[str] = mapped_column(String(16), default="free")
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -66,3 +69,18 @@ class VaultItem(Base):
     # AES-256-GCM output, base64: nonce || ciphertext || tag. Plaintext never stored.
     ciphertext: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class ScanQuota(Base):
+    """Daily scan counters for the freemium tiers. The key is an HMAC of
+    the caller identity (user id, or edge IP + day salt) — raw IPs are
+    never stored (docs/FREEMIUM.md). Rows older than 48h are pruned by
+    the quota check itself."""
+
+    __tablename__ = "scan_quota"
+    __table_args__ = (UniqueConstraint("key_hash", "day", name="uq_quota_key_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key_hash: Mapped[str] = mapped_column(String(64), index=True)
+    day: Mapped[str] = mapped_column(String(10))
+    count: Mapped[int] = mapped_column(Integer, default=0)

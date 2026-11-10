@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     app_name: str = "Aegis — Personal Cyber Defense Platform"
     environment: str = "development"
     secret_key: str = "dev-only-change-me-in-production-please-32chars"  # noqa: S105
+    # Freemium tiers (docs/FREEMIUM.md). Env-overridable: AEGIS_ANON_DAILY_SCAN_LIMIT etc.
+    anon_daily_scan_limit: int = 10
+    account_daily_scan_limit: int = 50
+    vault_free_item_limit: int = 20
+    history_free_days: int = 30
     access_token_minutes: int = 30
     refresh_token_days: int = 7
     database_url: str = "sqlite:///./aegis.db"

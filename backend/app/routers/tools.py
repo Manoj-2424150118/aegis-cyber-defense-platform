@@ -51,7 +51,9 @@ from app.validation import host_from_url, is_valid_domain, is_valid_host
 
 logger = logging.getLogger("aegis.tools")
 
-router = APIRouter(prefix="/api/tools", tags=["tools"])
+from app.quota import scan_quota
+
+router = APIRouter(prefix="/api/tools", tags=["tools"], dependencies=[Depends(scan_quota)])
 
 
 def _record(db: Session, user: User | None, scan_type: str, target: str, score: int, verdict: str) -> None:
@@ -498,13 +500,12 @@ async def trending(db: Session = Depends(get_db)):
 
 @router.get("/history")
 async def history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    rows = (
-        db.query(ScanHistory)
-        .filter(ScanHistory.user_id == user.id)
-        .order_by(ScanHistory.created_at.desc())
-        .limit(50)
-        .all()
-    )
+    query = db.query(ScanHistory).filter(ScanHistory.user_id == user.id)
+    if (user.plan or "free") != "pro":  # free accounts keep 30 days of history
+        from datetime import UTC, datetime, timedelta
+
+        query = query.filter(ScanHistory.created_at >= datetime.now(UTC) - timedelta(days=settings.history_free_days))
+    rows = query.order_by(ScanHistory.created_at.desc()).limit(50).all()
     return [
         {
             "id": r.id, "scan_type": r.scan_type, "target": r.target,
