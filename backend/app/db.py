@@ -31,24 +31,49 @@ def get_db():
         db.close()
 
 
-def init_db() -> None:
+def _add_user_columns() -> None:
+    """Additive columns for the users table (create_all never alters).
+
+    ALTER TABLE needs an exclusive lock, which a still-serving previous
+    instance can transiently block. Each attempt therefore runs with a
+    short lock timeout and the caller retries — a blocked migration must
+    fail fast and visibly, never hang startup silently (the v2.1.0
+    deploy timed out on exactly this shape of wait).
+    """
     from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing = {c["name"] for c in inspector.get_columns("users")}
+    additions = {
+        "plan": "VARCHAR(16) DEFAULT 'free'",
+        "totp_secret": "VARCHAR(64)",
+        "totp_enabled": "BOOLEAN DEFAULT FALSE",
+    }
+    missing = {k: v for k, v in additions.items() if k not in existing}
+    if not missing:
+        return
+    with engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            conn.execute(text("SET LOCAL lock_timeout = '4000'"))
+        for name, ddl in missing.items():
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+
+
+def init_db() -> None:
+    import logging
+    import time
 
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
-    # create_all never alters existing tables, so columns added after a
-    # database was first created (plan / TOTP in v2.1) are added here.
-    # Idempotent; new tables (scan_quota) come from create_all above.
-    inspector = inspect(engine)
-    if "users" in inspector.get_table_names():
-        existing = {c["name"] for c in inspector.get_columns("users")}
-        additions = {
-            "plan": "VARCHAR(16) DEFAULT 'free'",
-            "totp_secret": "VARCHAR(64)",
-            "totp_enabled": "BOOLEAN DEFAULT FALSE",
-        }
-        with engine.begin() as conn:
-            for name, ddl in additions.items():
-                if name not in existing:
-                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {ddl}"))
+    log = logging.getLogger("aegis.db")
+    for attempt in range(1, 7):
+        try:
+            _add_user_columns()
+            return
+        except Exception as exc:  # noqa: BLE001 — retried, then raised loudly
+            log.warning("schema migration attempt %s/6 failed: %s", attempt, exc)
+            time.sleep(5)
+    raise RuntimeError("schema migration did not complete after 6 attempts")
