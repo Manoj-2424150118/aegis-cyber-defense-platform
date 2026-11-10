@@ -28,8 +28,10 @@ export function VaultPanel() {
   const [master, setMaster] = useState("");
   const [opened, setOpened] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   function endSession(notice = true) {
+    setMode("login");
     setToken("");
     setItems([]);
     setOpened("");
@@ -77,15 +79,18 @@ export function VaultPanel() {
 
   async function auth(e: React.FormEvent) {
     e.preventDefault(); setError("");
+    setBusy(true);
     try {
       const r = mode === "login" ? await api.login(email, password) : await api.register(email, password);
       setToken(r.access_token);
     } catch (err) { setError(err instanceof Error ? err.message : "Authentication failed"); }
+    finally { setBusy(false); }
   }
 
   async function add(e: React.FormEvent) {
     e.preventDefault(); setError("");
     if (master.length < 12) { setError("Master password needs at least 12 characters."); return; }
+    setBusy(true);
     try {
       await api.vaultCreate(token, title, secret, master);
       setTitle(""); setSecret("");
@@ -96,7 +101,7 @@ export function VaultPanel() {
         if (fresh) { await load(fresh); return; }
         endSession();
       } else setError(err instanceof Error ? err.message : "Could not save item");
-    }
+    } finally { setBusy(false); }
   }
 
   async function open(id: number) {
