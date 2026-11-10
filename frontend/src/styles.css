@@ -165,7 +165,7 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
 .btn {
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
   padding: 0 20px; border-radius: var(--r-md); font-weight: 600; font-size: 0.9375rem;
-  text-decoration: none; border: 1px solid transparent; cursor: pointer;
+  text-decoration: none; border: 1px solid transparent; cursor: pointer; white-space: nowrap;
   transition: background-color var(--dur-hover) var(--ease-out), border-color var(--dur-hover) var(--ease-out);
 }
 .btn.primary { background: var(--accent); color: var(--accent-ink); }
@@ -204,7 +204,7 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
 .brand:hover { color: var(--text); }
 .brand .logo-mark { color: var(--accent); flex: none; }
 .nav-links { display: flex; gap: 28px; align-items: center; margin-left: 8px; }
-.nav-links a { color: var(--text-2); text-decoration: none; font-size: 0.9375rem; font-weight: 500; }
+.nav-links a { color: var(--text-2); text-decoration: none; font-size: 0.9375rem; font-weight: 500; white-space: nowrap; }
 .nav-links a:hover { color: var(--text); }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .live-pill {
@@ -241,6 +241,14 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
   .nav .live-pill { display: none; }
 }
 @media (max-width: 480px) { .nav .btn.primary { display: none; } .seg .seg-label { display: none; } .seg button { padding: 0 8px; } }
+@media (max-width: 640px) {
+  .command-bar { flex-wrap: wrap; }
+  .command-bar textarea { flex: 1; min-height: 40px; }
+  .command-bar .kbd { display: none; }
+  .command-bar button[type="submit"] { margin-left: auto; }
+  .panel-title { flex-basis: 100%; }
+}
+@media (max-width: 400px) { .nav .btn.ghost { display: none; } }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -299,7 +307,7 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
 }
 @keyframes scanline { to { transform: scaleX(1); } }
 .panel-head {
-  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
   padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
 }
 .panel-title { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
