@@ -70,6 +70,26 @@ The battery exists to find real defects. It found these; each fix has a regressi
 
 An early production battery run showed intermittent failures at registration. Root-cause analysis (curl control group: 8/8 registrations = 201; browser verification: all flows pass) traced it to the *test sandbox's egress proxy* truncating Python-urllib chunked responses (`IncompleteRead`), not to the application. The battery transport was switched to curl and the full suite then passed 30/30 in production. The incident is documented here because hiding it would make the report worthless.
 
+## v1.8.1 addendum — external audit remediation (10 Nov 2026)
+
+An owner-commissioned black-box assessment of the live v1.8.0 deployment (1 High, 6 Medium, 5 Low/Info) was remediated as v1.8.1 (commit 4affabb; 169 pytest, ruff/bandit clean, CI + CodeQL green):
+
+- **H-1 fetch rate limits (fixed):** the audit's 8 unthrottled web-audit calls passed under the pre-existing *general* 120/min limiter; the fetch-class endpoints (web-audit, url/resolve, tls, domain + stream variants) now have a dedicated **12/min per-IP** limiter (429 + Retry-After), and `/api/public/trending` serves a 60 s cached aggregate instead of a full table scan per call.
+- **M-1 trending poisoning (mitigated):** brands/domains are now stored **only for flagged verdicts**; a per-source burst cap (first 3 identical flagged signatures/minute count, further repeats dropped — source used in-memory only, never stored) blunts bulk fabrication while keeping genuine repeat signal; strict domain normalisation (M-4) removes junk keys at the source.
+- **M-2 upload (was already capped):** chunked reads with a 413 at 10 MiB existed since v1.1 — the audit's 8 MB probe was *under* the cap. Added an instant Content-Length pre-check so oversized uploads are rejected before the body is read (live-verified 413 on 11 MB).
+- **M-3 (fixed):** `openapi.json`/`docs`/`redoc` are not served when `AEGIS_ENVIRONMENT=production` (locally verified 404; live returns the SPA shell, no JSON map).
+- **M-4 (fixed):** `registrable_domain()` now returns a value only for a syntactically valid domain — IP literals, partial quads (`10.5`), scheme junk (`javascript`, `data`) return None and can never enter the feed again.
+- **M-5 (fixed):** the theme bootstrap moved from an inline `<script>` (blocked by our own `script-src 'self'`) to an external `/assets/theme-init.js`; the built page contains no inline executable script.
+- **M-6 (fixed):** no auth token is kept in web storage. The access token lives in page memory only; the refresh token is an **HttpOnly, Secure, SameSite=Strict cookie scoped to /api/auth** (live-verified attributes), and cookie-based refresh additionally requires a custom header (CSRF defence). Logout clears the cookie server-side. Live bundle contains zero references to the old `aegis_token` key; the full cookie flow (register → refresh without header 401 → with header 200 → vault 200 → logout → refresh 401) was verified against production.
+- **L-1 (already compliant):** breach check has always used HIBP k-anonymity (only the 5-char SHA-1 prefix leaves the server); request bodies are never logged (the request logger records method/path/status only).
+- **L-2 (already enforced):** registration rejects common passwords and any password scoring < 30 via the Password Lab engine — the audit read only the schema's minLength. No change needed.
+- **L-3 (fixed):** `/.well-known/security.txt` published (Contact + Expires + Canonical), live-verified.
+- **L-4 (fixed):** domain/TLS validation errors no longer reflect raw user input.
+- **L-5 (partially fixed):** uvicorn's `Server` header disabled (`--no-server-header`; live responses show only the edge's own header). `x-render-origin-server` is emitted by the hosting platform itself and cannot be stripped from inside the app.
+- **L-6 (accepted):** custom domain + email authentication deferred — owner's call (cost), not a code issue.
+- **§6.1 SSRF TOCTOU (accepted residual, documented):** the guard resolves and validates every hop immediately before connecting and re-validates each redirect; full IP-pinning for HTTPS (pinned IP + SNI/Host + cert verification) is not expressible with the stdlib fetcher and is out of proportion for a public demo whose targets are public hosts only. The window is milliseconds and private ranges are refused at validation time on every hop.
+- **Audit side-effect cleanup (Appendix A of the audit):** the probe account `secprobe+1794323411@example.com` and the junk `scan_events` domains it and earlier probes created were deleted from the production database; counts verified by follow-up SELECTs (see the session record).
+
 ## Known residual limits
 
 - Free-tier hosting sleeps when idle (first load ~1 min) and shares CPU; Argon2 operations take ~2s there. Paid tier or a second region removes this; the application code is unchanged.
