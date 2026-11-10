@@ -288,6 +288,8 @@ export const api = {
     post<{ risk_score: number; verdict: string; findings: Finding[] }>("/api/tools/email", { headers, body }),
   webAudit: (url: string) =>
     post<{ score: number; grade: string; reachable: boolean; findings: Finding[] }>("/api/tools/web-audit", { url }),
+  secretScan: (text: string) =>
+    post<{ risk_score: number; verdict: string; findings: Finding[]; secrets_found: number; types: string[]; redacted: boolean }>("/api/tools/secret-scan", { text }),
   checkMessage: (text: string) =>
     post<{ risk_score: number; verdict: string; findings: Finding[]; links_found: string[] }>("/api/tools/message", { text }),
   checkDomain: (domain: string) =>

@@ -17,7 +17,7 @@ Classification is deliberately conservative and deterministic:
 
 import re
 
-from app.modules import email_analyzer, message_analyzer, url_analyzer
+from app.modules import email_analyzer, message_analyzer, secret_scanner, url_analyzer
 from app.validation import host_from_url, is_valid_host
 
 _HEADER_LINE = re.compile(
@@ -31,12 +31,14 @@ _TOOL_LABELS = {
     "url": "Link Checker",
     "email": "Email Analyser",
     "message": "Message Checker",
+    "secret": "Secret Scanner",
 }
 
 _TYPE_LABELS = {
     "url": "a link",
     "email": "an email",
     "message": "a message",
+    "secret": "leaked secrets",
 }
 
 
@@ -90,6 +92,10 @@ def classify_input(text: str) -> str:
     # pasted email whose remaining headers were trimmed — still email.
     if len(lines) > 1 and lines and _HEADER_LINE.match(lines[0]):
         return "email"
+    # A blob carrying a recognisable credential format is a secrets
+    # incident, not a message — route it to the Secret Scanner.
+    if secret_scanner.quick_detect(stripped):
+        return "secret"
     return "message"
 
 
@@ -99,6 +105,8 @@ def smart_scan(text: str) -> dict:
     kind = classify_input(stripped)
     if kind == "url":
         result = url_analyzer.analyze_url(stripped).as_dict()
+    elif kind == "secret":
+        result = secret_scanner.scan_secrets(stripped)
     elif kind == "email":
         headers, body = split_email(stripped)
         result = email_analyzer.analyze_email(headers, body)

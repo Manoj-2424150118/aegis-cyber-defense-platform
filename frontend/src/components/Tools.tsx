@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, validateLookupTarget, type RedirectTrace } from "../api";
 import { copyText, ErrorNote, FindingsList, HERO_SCAN_EVENT, PasswordInput, ResultActions, ScanTimeline, ScoreMeter, Spinner, StrengthMeter, summaryText, useLiveScan, VerdictBadge } from "./Shared";
-import { FileSearchIcon, GlobeIcon, KeyIcon, LinkIcon, LockIcon, MailIcon, MessageIcon, ServerIcon, UploadIcon, XIcon } from "./icons";
+import { EyeOffIcon, FileSearchIcon, GlobeIcon, KeyIcon, LinkIcon, LockIcon, MailIcon, MessageIcon, ServerIcon, UploadIcon, XIcon } from "./icons";
 
 const PHISH_URL = "http://192.168.10.5/paypa1-secure-login.xyz/verify?account=suspended";
 const SAFE_URL = "https://www.google.com";
@@ -326,6 +326,59 @@ export function MessageChecker() {
           <div className="result-head"><span>Message risk</span><VerdictBadge score={result.risk_score} verdict={result.verdict} /></div>
           <ScoreMeter score={100 - result.risk_score} />
           {result.links_found.length > 0 && <p className="meta">Links found &amp; scored: {result.links_found.join(" · ")}</p>}
+          <FindingsList findings={result.findings} />
+          <ResultActions title="summary" summary={summaryText(result.verdict, result.risk_score, result.findings)} data={result} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+const SECRET_SAMPLE = `# staging config — pasted from a ticket (all values are fake examples)
+AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+DATABASE_URL=postgres://admin:Sup3rSecretPW@db.example.com:5432/app
+GITHUB_TOKEN=ghp_1234567890abcdefghijklmnopqrstuvwxyz`;
+
+export function SecretScanner() {
+  const [text, setText] = useState("");
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.secretScan>> | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function run(value: string) {
+    setError(""); setResult(null);
+    if (!value.trim()) { setError("Paste some text, a config or a code snippet to scan."); return; }
+    setBusy(true);
+    try {
+      setResult(await api.secretScan(value));
+    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="card" id="tool-secret">
+      <div className="card-head">
+        <span className="tile"><EyeOffIcon size={20} /></span>
+        <h2>Secret Scanner</h2>
+        <span className="tag">Secrets</span>
+      </div>
+      <p className="hint">Paste a config, code snippet, log or chat excerpt — exposed API keys, tokens, private keys and passwords, found and masked. The text is analysed in memory and never stored; results show masked forms only.</p>
+      <div className="field" style={{ marginBottom: 12 }}>
+        <span id="secret-label">Text to scan for leaked secrets</span>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Paste a .env, config file, code or logs…"} rows={5} aria-labelledby="secret-label" />
+      </div>
+      <div className="row">
+        <button onClick={() => run(text)} disabled={busy}>{busy ? <><Spinner /> Scanning…</> : "Scan for secrets"}</button>
+      </div>
+      <div className="samples">
+        <button type="button" className="sample" onClick={() => { setText(SECRET_SAMPLE); void run(SECRET_SAMPLE); }}>Try: leaked config</button>
+      </div>
+      <ErrorNote error={error} />
+      {result && (
+        <div className="result">
+          <div className="result-head"><span>Exposure risk</span><VerdictBadge score={result.risk_score} verdict={result.verdict} /></div>
+          <ScoreMeter score={100 - result.risk_score} />
+          {result.secrets_found > 0
+            ? <p className="meta">{result.secrets_found} credential(s) found: {result.types.join(", ")}. Rotate every one — masked here, but fully exposed wherever this text was shared.</p>
+            : <p className="meta">No recognisable credentials in this text.</p>}
           <FindingsList findings={result.findings} />
           <ResultActions title="summary" summary={summaryText(result.verdict, result.risk_score, result.findings)} data={result} />
         </div>

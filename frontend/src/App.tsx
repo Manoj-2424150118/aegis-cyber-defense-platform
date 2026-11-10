@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type SmartScanResult, type Trending } from "./api";
-import { DomainChecker, EmailAnalyzer, FileScanner, MessageChecker, PasswordLab, TlsInspector, UrlChecker, WebAudit } from "./components/Tools";
+import { DomainChecker, EmailAnalyzer, FileScanner, MessageChecker, PasswordLab, SecretScanner, TlsInspector, UrlChecker, WebAudit } from "./components/Tools";
 import { VaultPanel } from "./components/VaultPanel";
 import { ErrorNote, FindingsList, ResultActions, ScoreMeter, summaryText, VerdictBadge } from "./components/Shared";
 import {
   ArrowRightIcon, ArrowUpRightIcon, CheckIcon, ChevronDownIcon, FileSearchIcon, GlobeIcon,
   InfoIcon, KeyIcon, LinkIcon, LockIcon, LogoMark, MailIcon, MenuIcon, MessageIcon,
   MonitorIcon, MoonIcon, SearchIcon, ServerIcon, ShieldCheckIcon, SunIcon, XIcon,
+  EyeOffIcon,
 } from "./components/icons";
 
 const REPO = "https://github.com/Manoj-2424150118/aegis-cyber-defense-platform";
@@ -20,7 +21,7 @@ const COVERAGE = [
   { icon: <GlobeIcon size={20} />, threat: "Unsafe websites", defense: "Website Audit", anchor: "tool-web", blurb: "Grades HTTPS, security headers and cookie flags — and shows the owner how to fix them." },
   { icon: <ServerIcon size={20} />, threat: "Spoofable domains", defense: "Domain Checker", anchor: "tool-domain", blurb: "Can anyone send email as this domain? SPF, DMARC, CAA and DNS health, graded from live records." },
   { icon: <LockIcon size={20} />, threat: "Bad TLS certificates", defense: "TLS Inspector", anchor: "tool-tls", blurb: "Issuer, expiry runway, hostname coverage and protocol version — from a real handshake." },
-  { icon: <ShieldCheckIcon size={20} />, threat: "Stolen secrets", defense: "Encrypted Vault", anchor: "tool-vault", blurb: "AES-256-GCM encryption with an Argon2id-derived key. The server stores only ciphertext, never the key." },
+  { icon: <EyeOffIcon size={20} />, threat: "Leaked secrets & keys", defense: "Secret Scanner", anchor: "tool-secret", blurb: "Finds exposed API keys, tokens and passwords in pasted configs and code — masked, never stored." },
 ] as const;
 
 const TOOL_NAV = [
@@ -32,10 +33,11 @@ const TOOL_NAV = [
   { label: "Website Audit", anchor: "tool-web" },
   { label: "Domain Checker", anchor: "tool-domain" },
   { label: "TLS Inspector", anchor: "tool-tls" },
+  { label: "Secret Scanner", anchor: "tool-secret" },
   { label: "Vault", anchor: "tool-vault" },
 ] as const;
 
-const TRUST = ["No sign-up", "Nothing stored", "Nine tools, one place", "Every result explained"] as const;
+const TRUST = ["No sign-up", "Nothing stored", "Ten tools, one place", "Every result explained"] as const;
 
 type ThemeMode = "auto" | "light" | "dark";
 
@@ -252,6 +254,7 @@ export default function App() {
     { id: "tool-web", name: "Website Safety Audit", kw: "website audit headers https cookies security grade", node: <WebAudit /> },
     { id: "tool-domain", name: "Domain Security Checker", kw: "domain dns spf dmarc caa email spoofing mx", node: <DomainChecker /> },
     { id: "tool-tls", name: "TLS Certificate Inspector", kw: "tls ssl certificate https expiry issuer handshake", node: <TlsInspector /> },
+    { id: "tool-secret", name: "Secret Scanner", kw: "secret api key token leak env config credentials exposed password", node: <SecretScanner /> },
     { id: "tool-vault", name: "Encrypted Vault", kw: "vault secrets password manager encryption storage", node: <VaultPanel /> },
   ];
   const visibleTools = TOOLS.filter((t) => `${t.name} ${t.kw}`.toLowerCase().includes(filter.trim().toLowerCase()));
@@ -340,7 +343,7 @@ export default function App() {
             <p className="hero-eyebrow">Personal cyber defense, without the noise.</p>
             <h1>Check it first. <span className="quiet">Open it safely.</span></h1>
             <p className="sub">
-              Nine free checks for the links, emails, messages, files and passwords that reach
+              Ten free checks for the links, emails, messages, files, passwords and pasted configs that reach
               you every day — each one explained, signal by signal.
             </p>
             <form
@@ -402,7 +405,7 @@ export default function App() {
           <section id="coverage" className="section reveal">
             <p className="eyebrow">Coverage</p>
             <h2 className="section-title">What it covers</h2>
-            <p className="section-sub">Nine tools, one platform. Pick a threat and jump straight to its tool.</p>
+            <p className="section-sub">Ten tools, one platform. Pick a threat and jump straight to its tool.</p>
             <div className="cover-grid">
               {COVERAGE.map((c) => (
                 <a key={c.threat} className="cover-card" href={`#${c.anchor}`}>
@@ -439,7 +442,7 @@ export default function App() {
               {visibleTools.map((t) => (
                 <div key={t.id} className="tool-cell">{t.node}</div>
               ))}
-              {visibleTools.length === 0 && <p className="meta">No tool matches “{filter}”. Try a shorter word — or clear the filter to see all nine.</p>}
+              {visibleTools.length === 0 && <p className="meta">No tool matches “{filter}”. Try a shorter word — or clear the filter to see all ten.</p>}
             </div>
           </section>
 

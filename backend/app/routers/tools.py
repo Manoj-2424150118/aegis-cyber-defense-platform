@@ -27,6 +27,7 @@ from app.modules import (
     message_analyzer,
     password_lab,
     redirect_tracer,
+    secret_scanner,
     smart_scan,
     tls_inspector,
     url_analyzer,
@@ -40,6 +41,7 @@ from app.schemas import (
     GenerateRequest,
     MessageRequest,
     PasswordRequest,
+    SecretScanRequest,
     SmartScanRequest,
     TlsRequest,
     UrlRequest,
@@ -269,6 +271,18 @@ async def check_tls(body: TlsRequest):
         raise HTTPException(400, str(exc)) from None
 
 
+@router.post("/secret-scan")
+async def secret_scan(body: SecretScanRequest, request: Request):
+    """Find leaked credentials in pasted text. The text is analysed in
+    memory only; the response contains masked forms exclusively —
+    never the secret itself."""
+    result = secret_scanner.scan_secrets(body.text)
+    _record_event("secret-scan", result["verdict"], result["risk_score"],
+                  codes=[f["code"] for f in result["findings"]],
+                  source=client_ip(request))
+    return result
+
+
 @router.post("/smart-scan")
 async def smart_scan_endpoint(body: SmartScanRequest, request: Request):
     """One box for anything pasted: Smart Scan detects whether the
@@ -287,6 +301,9 @@ async def smart_scan_endpoint(body: SmartScanRequest, request: Request):
         _record_event("url", result["verdict"], result["risk_score"],
                       domain=url_analyzer.registrable_domain(target),
                       brand=url_analyzer.impersonated_brand(target), codes=codes,
+                      source=client_ip(request))
+    elif envelope["detected_type"] == "secret":
+        _record_event("secret-scan", result["verdict"], result["risk_score"], codes=codes,
                       source=client_ip(request))
     elif envelope["detected_type"] == "email":
         _record_event("email", result["verdict"], result["risk_score"],
