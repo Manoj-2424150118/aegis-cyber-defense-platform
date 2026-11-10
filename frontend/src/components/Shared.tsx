@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Finding, LiveStepEvent, StreamHandlers } from "../api";
+import { AlertIcon, CheckCircleIcon, CheckIcon, CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon, InfoIcon } from "./icons";
 
 /** The hero scan box dispatches this event; the URL checker listens
  * for it, adopts the value and runs — one search surface, like the
@@ -13,8 +14,20 @@ export function verdictClass(score: number): string {
   return "good";
 }
 
+function VerdictIcon({ cls }: { cls: string }) {
+  if (cls === "good") return <CheckCircleIcon size={15} />;
+  if (cls === "info") return <InfoIcon size={15} />;
+  return <AlertIcon size={15} />;
+}
+
 export function VerdictBadge({ score, verdict }: { score: number; verdict: string }) {
-  return <span className={`badge ${verdictClass(score)}`}>{verdict} · {score}/100</span>;
+  const cls = verdictClass(score);
+  return (
+    <span className={`badge ${cls}`}>
+      <VerdictIcon cls={cls} />
+      {verdict} · {score}/100
+    </span>
+  );
 }
 
 export function ScoreMeter({ score }: { score: number }) {
@@ -29,9 +42,12 @@ export function ScoreMeter({ score }: { score: number }) {
 
 export function StrengthMeter({ score }: { score: number }) {
   const cls = score >= 70 ? "good" : score >= 40 ? "warn" : "bad";
+  const filled = Math.max(0, Math.min(5, Math.round(score / 20)));
   return (
-    <div className="meter" role="img" aria-label={`strength ${score} of 100`}>
-      <div className={`meter-fill ${cls}`} style={{ width: `${score}%` }} />
+    <div className="meter-segs" role="img" aria-label={`strength ${score} of 100`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={`seg-fill${i < filled ? ` on-${cls}` : ""}`} />
+      ))}
     </div>
   );
 }
@@ -42,11 +58,12 @@ export function FindingsList({ findings }: { findings: Finding[] }) {
       {findings.map((f, i) => (
         <li key={i}>
           <div className="finding-main">
-            <span className={f.points > 0 ? "finding-points hit" : "finding-points ok"}>{f.points > 0 ? `+${f.points}` : "✓"}</span>
+            <span className={`sev-dot ${f.points >= 25 ? "bad" : f.points > 0 ? "hit" : "ok"}`} aria-hidden="true" />
             <span>{f.message}</span>
+            <span className="finding-points">{f.points > 0 ? `+${f.points}` : "clear"}</span>
           </div>
           {f.fix && (
-            <p className="fix-line"><strong>Suggested fix — </strong>{f.fix}</p>
+            <p className="fix-line"><strong>Fix — </strong>{f.fix}</p>
           )}
         </li>
       ))}
@@ -56,14 +73,77 @@ export function FindingsList({ findings }: { findings: Finding[] }) {
 
 export function ErrorNote({ error }: { error: string }) {
   if (!error) return null;
-  return <p className="error" role="alert">{error}</p>;
+  return (
+    <p className="error" role="alert">
+      <AlertIcon size={17} />
+      <span>{error}</span>
+    </p>
+  );
 }
 
 export function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
 }
 
-/* ---------- Live agent view ---------- */
+/** Copy-summary / copy-JSON actions offered under every result. */
+export function ResultActions({ title, summary, data }: { title: string; summary: string; data: unknown }) {
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
+  return (
+    <div className="actions-row">
+      <button type="button" className="copy" onClick={() => void copyText(summary, setCopiedSummary)}>
+        <CopyIcon size={14} /> {copiedSummary ? "Copied" : `Copy ${title}`}
+      </button>
+      <button type="button" className="copy" onClick={() => void copyText(JSON.stringify(data, null, 2), setCopiedJson)}>
+        <DownloadIcon size={14} /> {copiedJson ? "Copied" : "Copy as JSON"}
+      </button>
+    </div>
+  );
+}
+
+export function summaryText(verdict: string, score: number, findings: Finding[]): string {
+  const lines = findings.map((f) => `${f.points > 0 ? `+${f.points}` : "clear"} — ${f.message}`);
+  return `Aegis result: ${verdict} (${score}/100)\n${lines.join("\n")}`;
+}
+
+/** Password field with a show/hide toggle. */
+export function PasswordInput({
+  value, onChange, placeholder, ariaLabel, autoComplete = "off", required,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  ariaLabel: string;
+  autoComplete?: string;
+  required?: boolean;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="pw-wrap">
+      <input
+        type={shown ? "text" : "password"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={ariaLabel}
+        autoComplete={autoComplete}
+        required={required}
+      />
+      <button
+        type="button"
+        className="pw-toggle"
+        onClick={() => setShown((s) => !s)}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        tabIndex={-1}
+      >
+        {shown ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+      </button>
+    </div>
+  );
+}
+
+/* ---------- Live scan timeline ---------- */
 
 export interface LiveScanState<T> {
   steps: LiveStepEvent[];
@@ -75,7 +155,7 @@ export interface LiveScanState<T> {
 }
 
 /** Drives a streamed analysis: collects step events as the server
- * executes each stage, tracks elapsed time for the console header. */
+ * executes each stage, tracks elapsed time for the timeline header. */
 export function useLiveScan<T>(): LiveScanState<T> {
   const [steps, setSteps] = useState<LiveStepEvent[]>([]);
   const [total, setTotal] = useState(0);
@@ -121,48 +201,65 @@ function detailText(detail: Record<string, unknown>): string {
     .join(" · ");
 }
 
-interface ConsoleScanView {
+interface TimelineScanView {
   steps: LiveStepEvent[];
   total: number;
   running: boolean;
   elapsedMs: number;
 }
 
-export function LiveConsole({ scan, error }: { scan: ConsoleScanView; error?: string }) {
-  const bodyRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
-  }, [scan.steps, scan.running]);
+/** The scan timeline: each completed stage with its findings, then —
+ * while streaming — one active step. Announced politely to screen
+ * readers via aria-live; technical values stay in mono. */
+export function ScanTimeline({ scan, error }: { scan: TimelineScanView; error?: string }) {
   if (!scan.running && scan.steps.length === 0 && !error) return null;
   return (
-    <div className="console" role="log" aria-live="polite" aria-label="Live analysis trace">
-      <div className="console-head">
-        <span className="cdot r" /><span className="cdot y" /><span className="cdot g" />
-        <span className="console-title">AEGIS AGENT · LIVE ANALYSIS</span>
-        <span className="console-time">{(scan.elapsedMs / 1000).toFixed(1)}s</span>
+    <div className="timeline" aria-live="polite" aria-label="Live analysis progress">
+      <div className="timeline-head">
+        <span className="timeline-title">Analysis</span>
+        <span className="timeline-time">{(scan.elapsedMs / 1000).toFixed(1)}s</span>
       </div>
-      <div className="console-body" ref={bodyRef}>
+      <div>
         {scan.steps.map((s) => (
-          <div className="cline" key={s.index}>
-            <div className="cline-main">
-              <span className="cstep">[{s.index}/{scan.total || "?"}]</span>
-              <span className="cmark">✓</span>
-              <span className="clabel">{s.label}</span>
-              {typeof s.running_score === "number" && <span className="cscore">risk {s.running_score}</span>}
+          <div className="t-step" key={s.index}>
+            <span className="t-marker"><CheckIcon size={14} /></span>
+            <div>
+              <div className="t-step-main">
+                <span className="t-step-num">{s.index}/{scan.total || "?"}</span>
+                <span className="t-step-label">{s.label}</span>
+                {typeof s.running_score === "number" && <span className="t-score">risk {s.running_score}</span>}
+              </div>
+              {s.findings.map((f) => (
+                <div className="t-finding hit" key={f.code}>
+                  <span className={`sev-dot ${f.points >= 25 ? "bad" : "hit"}`} aria-hidden="true" />
+                  <span>{f.message}</span>
+                  <span className="t-points">+{f.points}</span>
+                </div>
+              ))}
+              {s.detail && <div className="t-detail">{detailText(s.detail)}</div>}
+              {s.findings.length === 0 && !s.detail && (
+                <div className="t-finding">
+                  <span className="sev-dot ok" aria-hidden="true" />
+                  <span>Clear — nothing found</span>
+                </div>
+              )}
             </div>
-            {s.findings.map((f) => (
-              <div className="cfinding hit" key={f.code}>↳ +{f.points} — {f.message}</div>
-            ))}
-            {s.detail && <div className="cfinding info">↳ {detailText(s.detail)}</div>}
-            {s.findings.length === 0 && !s.detail && <div className="cfinding ok">↳ clear — nothing found</div>}
           </div>
         ))}
         {scan.running && (
-          <div className="cline working">
-            <span className="cpulse">●</span> agent working<span className="cursor">▍</span>
+          <div className="t-step" aria-hidden="true">
+            <span className="t-marker active"><span className="t-pulse" /></span>
+            <div className="t-step-main">
+              <span className="t-step-label" style={{ color: "var(--text-2)", fontWeight: 500 }}>Working…</span>
+            </div>
           </div>
         )}
-        {error && <div className="cline err">✕ {error}</div>}
+        {error && (
+          <div className="t-error" role="alert">
+            <AlertIcon size={17} />
+            <span>{error}</span>
+          </div>
+        )}
       </div>
     </div>
   );

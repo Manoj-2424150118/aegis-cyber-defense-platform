@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { ErrorNote } from "./Shared";
+import { ErrorNote, PasswordInput } from "./Shared";
+import { LockIcon } from "./icons";
 
 /* Session model: the access token lives only in page memory and the
  * refresh token in an HttpOnly cookie — nothing auth-related sits in
@@ -124,12 +125,22 @@ export function VaultPanel() {
 
   if (!token) {
     return (
-      <section className="card">
-        <div className="card-head"><h2>🗄️ Encrypted Vault</h2><span className="tag">Module 06</span></div>
-        <p className="hint">Recovery codes, PINs and notes, encrypted with AES-256-GCM — the server only ever sees ciphertext.</p>
+      <section className="card" id="tool-vault">
+        <div className="card-head">
+          <span className="tile"><LockIcon size={20} /></span>
+          <h2>Encrypted Vault</h2>
+          <span className="tag">Vault</span>
+        </div>
+        <p className="hint">Recovery codes, PINs and notes, encrypted with AES-256-GCM. The server only ever sees ciphertext.</p>
         <form onSubmit={auth} className="stack">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required aria-label="Email" />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Account password (12+ characters)" required aria-label="Password" />
+          <div className="field">
+            <span id="v-email-label">Email</span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required aria-labelledby="v-email-label" autoComplete="email" />
+          </div>
+          <div className="field">
+            <span id="v-pass-label">Account password</span>
+            <PasswordInput value={password} onChange={setPassword} placeholder="12+ characters" ariaLabel="Account password" autoComplete={mode === "login" ? "current-password" : "new-password"} required />
+          </div>
           <button>{mode === "login" ? "Log in" : "Create account"}</button>
           <button type="button" className="linklike" onClick={() => setMode(mode === "login" ? "register" : "login")}>
             {mode === "login" ? "New here? Create an account" : "Already registered? Log in"}
@@ -141,12 +152,26 @@ export function VaultPanel() {
   }
 
   return (
-    <section className="card">
-      <div className="card-head"><h2>🗄️ Encrypted Vault</h2><span className="tag">Module 06</span></div>
+    <section className="card" id="tool-vault">
+      <div className="card-head">
+        <span className="tile"><LockIcon size={20} /></span>
+        <h2>Encrypted Vault</h2>
+        <span className="tag">Vault</span>
+      </div>
+      <p className="hint">Your master password encrypts and decrypts items on this device. It is never sent to or stored by the server — if you forget it, items cannot be recovered.</p>
       <form onSubmit={add} className="stack">
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Bank recovery codes)" required aria-label="Item title" />
-        <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Secret to encrypt" required aria-label="Secret" />
-        <input type="password" value={master} onChange={(e) => setMaster(e.target.value)} placeholder="Master password (12+ characters — encrypts/decrypts items)" required aria-label="Master password" />
+        <div className="field">
+          <span id="v-title-label">Title</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Bank recovery codes" required aria-labelledby="v-title-label" />
+        </div>
+        <div className="field">
+          <span id="v-secret-label">Secret to encrypt</span>
+          <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="The code, PIN or note itself" required aria-labelledby="v-secret-label" />
+        </div>
+        <div className="field">
+          <span id="v-master-label">Master password</span>
+          <PasswordInput value={master} onChange={setMaster} placeholder="12+ characters" ariaLabel="Master password" required />
+        </div>
         <button>Add encrypted item</button>
       </form>
       <ErrorNote error={error} />
