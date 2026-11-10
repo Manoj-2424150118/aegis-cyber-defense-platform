@@ -26,6 +26,52 @@ COMMON_PASSWORDS = {
     "admin", "welcome", "login", "passw0rd", "india123", "cricket",
 }
 SYMBOLS = "!@#$%^&*()-_=+[]{};:,.<>?/"
+_KEYBOARD_ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm", "1234567890", "!@#$%^&*()"]
+_LEET = str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "!": "i"})
+_DICTIONARY_WORDS = COMMON_PASSWORDS | {
+    "football", "master", "shadow", "michael", "ninja", "mustang",
+    "charlie", "jordan", "hunter", "computer", "internet", "warrior",
+    "sunshine", "princess", "baseball", "stargate", "pokemon", "naruto",
+}
+
+
+def _detect_patterns(password: str) -> list[tuple[str, str, int | None]]:
+    """zxcvbn-style pattern detection the raw-entropy score can't see:
+    returns (code, issue, score-cap-or-None) tuples. Raw entropy treats
+    'qwerty123!' as ~66 bits; pattern attacks treat it as one guess."""
+    lower = password.lower()
+    found: list[tuple[str, str, int | None]] = []
+    for row in _KEYBOARD_ROWS:
+        for variant in (row, row[::-1]):
+            if any(variant[i:i + 4] in lower for i in range(len(variant) - 3)):
+                found.append(("keyboard-walk", "Contains a keyboard walk (qwerty / asdf / 1234 rows) — among the first patterns cracking tools try.", 30))
+                break
+        else:
+            continue
+        break
+    run = 1
+    ascending = descending = False
+    for a, b in zip(lower, lower[1:]):
+        if ord(b) - ord(a) == 1 and a.isalnum() and b.isalnum():
+            run += 1
+            ascending = ascending or run >= 4
+        elif ord(a) - ord(b) == 1 and a.isalnum() and b.isalnum():
+            run += 1
+            descending = descending or run >= 4
+        else:
+            run = 1
+    if ascending or descending:
+        found.append(("sequence", "Contains a character sequence (abcd… / 4321…) — sequences are guessed almost instantly.", 35))
+    import re as _re
+    if _re.search(r"(?:19|20)\d{2}", password):
+        found.append(("year", "Contains a year — dates and years are in every cracking wordlist.", None))
+    leet_alpha = "".join(c for c in password.lower().translate(_LEET) if c.isalpha())
+    dict_hit = next((w for w in _DICTIONARY_WORDS if len(w) >= 5 and w in leet_alpha), None)
+    if dict_hit and password.lower() not in COMMON_PASSWORDS:
+        found.append(("dictionary", f"Built on the dictionary word '{dict_hit}' (leetspeak doesn't hide it — crackers substitute 0→o, @→a automatically).", 30))
+    if _re.search(r"(.{2,4})\1{1,}", password) and len(password) >= 6:
+        found.append(("repeat", "Repeats a short chunk (abcabc…) — repetition adds almost no real entropy.", 35))
+    return found
 
 
 def _entropy_bits(password: str) -> float:
@@ -83,6 +129,11 @@ def assess_password(password: str) -> dict:
         issues.append("Too much repetition — avoid repeated characters and patterns.")
     entropy = _entropy_bits(password)
     score = max(0, min(100, int(entropy * 1.2) - (40 if password.lower() in COMMON_PASSWORDS else 0)))
+    patterns = _detect_patterns(password)
+    for _code, issue, cap in patterns:
+        issues.append(issue)
+        if cap is not None:
+            score = min(score, cap)
     # Raw charset entropy overrates repetition: "aaaaaaaaaaaa" is not a
     # 56-bit secret in practice. Cap the score when a password is built from
     # very few distinct characters (pattern/repetition attacks crush it).
@@ -91,6 +142,7 @@ def assess_password(password: str) -> dict:
     label = "very weak" if score < 30 else "weak" if score < 50 else "fair" if score < 70 else "strong" if score < 90 else "excellent"
     return {
         "score": score, "label": label, "entropy_bits": entropy,
+        "patterns": [code for code, _issue, _cap in patterns],
         "estimated_crack_time_offline": _crack_time(entropy),
         "issues": issues or ["No issues found. Use a unique password per site, stored in a manager."],
         "is_common_password": password.lower() in COMMON_PASSWORDS,
