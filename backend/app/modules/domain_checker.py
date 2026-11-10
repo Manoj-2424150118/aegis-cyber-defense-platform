@@ -9,6 +9,12 @@ Scoring is split from fetching (``evaluate_domain`` is a pure function
 of the record set) so the rubric is unit-tested without any network.
 """
 
+import base64
+import json
+import re
+import urllib.request
+from datetime import datetime, timezone
+
 import dns.exception
 import dns.resolver
 
@@ -27,14 +33,73 @@ def _resolve(resolver: dns.resolver.Resolver, name: str, rdtype: str) -> list[st
         return []
 
 
+# DKIM selectors probed at {selector}._domainkey — the names the big
+# mail platforms actually use. DKIM has no wildcard discovery, so a
+# miss proves nothing; a hit is a fact.
+DKIM_SELECTORS = ["google", "default", "selector1", "selector2", "mail",
+                  "dkim", "k1", "s1", "mandrill", "smtp", "fm1", "zmail"]
+
+# Services where an unclaimed / deleted resource leaves a dangling
+# CNAME that an attacker can register — subdomain takeover.
+TAKEOVER_PRONE_SUFFIXES = (
+    "github.io", "herokuapp.com", "azurewebsites.net", "cloudapp.net",
+    "s3.amazonaws.com", "wordpress.com", "squarespace.com", "shopify.com",
+    "fastly.net", "unbouncepages.com", "ghost.io", "surge.sh",
+    "bitbucket.io", "pantheonsite.io", "zendesk.com", "netlify.app",
+    "vercel.app", "webflow.io", "tilda.ws", "helpjuice.com",
+)
+
+
+def _dkim_probe(resolver: dns.resolver.Resolver, domain: str) -> list[dict]:
+    found: list[dict] = []
+    for selector in DKIM_SELECTORS:
+        for txt in _resolve(resolver, f"{selector}._domainkey.{domain}", "TXT"):
+            joined = txt.replace('" "', "").replace('"', "")
+            if "v=dkim1" not in joined.lower() and "p=" not in joined.lower():
+                continue
+            bits = None
+            m = re.search(r"p=([A-Za-z0-9+/=]+)", joined)
+            if m:
+                try:
+                    bits = len(base64.b64decode(m.group(1) + "===")) * 8
+                except Exception:
+                    bits = None
+            found.append({"selector": selector, "key_bits": bits})
+    return found
+
+
+def _rdap_created(domain: str) -> str | None:
+    """Registration date from the public RDAP directory (rdap.org
+    redirects to the authoritative registrar RDAP). Best-effort: any
+    failure returns None and the checker simply says less."""
+    try:
+        req = urllib.request.Request(
+            f"https://rdap.org/domain/{domain}",
+            headers={"User-Agent": "Aegis-Domain-Checker/2.0", "Accept": "application/rdap+json"},
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310 - fixed public directory host, domain is format-validated
+            data = json.loads(resp.read(262144))
+        for event in data.get("events", []):
+            if event.get("eventAction") in ("registration", "registered"):
+                return str(event.get("eventDate"))[:10]
+    except Exception:
+        return None
+    return None
+
+
 def fetch_records(domain: str) -> dict:
-    """All DNS lookups for the checker. Only DNS queries are made —
-    the domain is format-validated by the caller, and DNS itself
-    cannot be used to reach internal services."""
+    """All DNS lookups for the checker, plus DKIM selector probing and
+    the RDAP registration date. Only directory/DNS queries are made —
+    the domain is format-validated by the caller first."""
     resolver = dns.resolver.Resolver()
     resolver.lifetime = _TIMEOUT
     txt = _resolve(resolver, domain, "TXT")
     dmarc_txt = _resolve(resolver, f"_dmarc.{domain}", "TXT")
+    cname = _resolve(resolver, domain, "CNAME")
+    cname_resolves = True
+    if cname:
+        target = cname[0].rstrip(".")
+        cname_resolves = bool(_resolve(resolver, target, "A") or _resolve(resolver, target, "AAAA"))
     return {
         "a": _resolve(resolver, domain, "A"),
         "aaaa": _resolve(resolver, domain, "AAAA"),
@@ -43,6 +108,10 @@ def fetch_records(domain: str) -> dict:
         "spf": [t for t in txt if t.lower().startswith("v=spf1")],
         "dmarc": [t for t in dmarc_txt if t.lower().startswith("v=dmarc1")],
         "caa": _resolve(resolver, domain, "CAA"),
+        "cname": cname,
+        "cname_resolves": cname_resolves,
+        "dkim": _dkim_probe(resolver, domain),
+        "rdap_created": _rdap_created(domain),
     }
 
 
@@ -68,6 +137,19 @@ def _stage_dns(ctx: _DomainContext) -> None:
         ctx.add(15, "mx-present", f"Mail servers are configured ({len(r['mx'])} MX record(s)) — the domain can receive email.")
     else:
         ctx.add(0, "mx-missing", "No MX records — the domain cannot receive email. Any 'mail from' this domain deserves extra suspicion, and replies to it go nowhere.")
+    created = r.get("rdap_created")
+    if created:
+        try:
+            age = (datetime.now(timezone.utc).date() - datetime.strptime(created, "%Y-%m-%d").date()).days
+            if 0 <= age < 30:
+                ctx.add(0, "domain-very-new", f"RDAP shows this domain was registered only {age} day(s) ago ({created}). Brand-new domains are the default infrastructure of phishing campaigns — established organisations almost never mail from one.")
+        except ValueError:
+            pass
+    for target in r.get("cname", []):
+        bare = target.rstrip(".").lower()
+        if any(bare == suf or bare.endswith("." + suf) for suf in TAKEOVER_PRONE_SUFFIXES) and not r.get("cname_resolves", True):
+            ctx.add(0, "dangling-cname", f"The domain's CNAME points at {bare}, which no longer resolves — if that service resource was deleted, an attacker can re-register it and take over this subdomain (subdomain takeover).")
+            break
 
 
 def _stage_spf(ctx: _DomainContext) -> None:
@@ -79,6 +161,9 @@ def _stage_spf(ctx: _DomainContext) -> None:
         ctx.add(0, "spf-missing", "No SPF record — nothing tells receivers which servers may send mail for this domain, so forged mail is harder to filter.")
         return
     record = spf[0].lower()
+    lookups = len(re.findall(r"(?:include:|(?<!\w)(?:a|mx|ptr|exists)(?::|\s|$)|redirect=)", record))
+    if lookups > 10:
+        ctx.add(0, "spf-too-many-lookups", f"This SPF record needs ~{lookups} DNS lookups to evaluate — over the RFC 7208 limit of 10, so receivers return PermError and may treat SPF as absent. The domain is effectively less protected than the record suggests.")
     if record.rstrip().endswith("-all"):
         ctx.add(25, "spf-strong", "SPF is published with a hard fail (-all): receivers are told to reject mail from unauthorised servers.")
     elif record.rstrip().endswith("~all"):
@@ -99,6 +184,21 @@ def _stage_dmarc(ctx: _DomainContext) -> None:
         ctx.add(24, "dmarc-quarantine", "DMARC is at p=quarantine: unauthenticated mail is sent to spam rather than rejected. Move to p=reject once reporting shows no legitimate senders break.")
     else:
         ctx.add(10, "dmarc-monitor", "DMARC exists but is monitor-only (p=none): it collects reports yet blocks nothing. Spoofed mail is still delivered — progress to p=quarantine, then p=reject.")
+    pct = re.search(r"pct=(\d+)", record)
+    if pct and int(pct.group(1)) < 100:
+        ctx.add(0, "dmarc-partial", f"DMARC is applied to only {pct.group(1)}% of mail (pct={pct.group(1)}) — the rest is exempt from the policy, leaving a spoofing lane open. Raise pct to 100 once reports are clean.")
+    sp = re.search(r"sp=(none|quarantine|reject)", record)
+    if ("p=reject" in record or "p=quarantine" in record) and sp and sp.group(1) == "none":
+        ctx.add(0, "dmarc-subdomain-gap", "DMARC's subdomain policy is sp=none while the main policy is enforced — subdomains remain freely spoofable. Set sp=reject (or remove sp= so it inherits p=).")
+    dkim = ctx.records.get("dkim", [])
+    if dkim:
+        desc = ", ".join(f"selector '{d['selector']}'" + (f" (~{d['key_bits']}-bit key)" if d.get("key_bits") else "") for d in dkim[:3])
+        ctx.add(0, "dkim-present", f"DKIM signing is published ({desc}) — receivers can verify that mail really came from this domain's servers and was not altered.")
+        weak = [d for d in dkim if d.get("key_bits") and d["key_bits"] < 1024]
+        if weak:
+            ctx.add(0, "dkim-weak-key", f"A DKIM key (selector '{weak[0]['selector']}') is only ~{weak[0]['key_bits']} bits — 1024-bit RSA DKIM keys have been factorable in research since 2012. Rotate to 2048 bits.")
+    else:
+        ctx.add(0, "dkim-not-detected", "No DKIM key found under the common selectors probed. DKIM has no public discovery mechanism, so this does NOT prove DKIM is absent — but if the domain truly doesn't sign, forged mail has one less check to fail.")
 
 
 def _stage_caa(ctx: _DomainContext) -> None:

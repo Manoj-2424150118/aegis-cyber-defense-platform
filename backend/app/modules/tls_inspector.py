@@ -100,6 +100,15 @@ def grade_certificate(host: str, cert: dict, protocol: str | None, verified: boo
     else:
         add(8, "tls-modern-protocol", "Protocol version could not be read from the handshake; chain and hostname checks still apply.")
 
+    sig_alg = str(cert.get("signatureAlgorithm") or "").lower()
+    if sig_alg and ("sha1" in sig_alg or "md5" in sig_alg):
+        add(0, "tls-weak-signature", f"The certificate is signed with {cert['signatureAlgorithm']} — SHA-1/MD5 signatures are collision-broken and distrusted by browsers.")
+    key_info = str(cert.get("keyInfo") or "")
+    key_bits_match = __import__("re").search(r"(\d+)-bit", key_info)
+    if key_bits_match:
+        bits = int(key_bits_match.group(1))
+        if (key_info.startswith("RSA") and bits < 2048) or (key_info.startswith("EC") and bits < 256):
+            add(0, "tls-weak-key", f"The certificate's public key is only {key_info} — below the modern minimum (RSA 2048 / EC 256).")
     if san:
         add(15, "tls-san-present", f"The certificate lists {len(san)} subject-alt-name(s), the modern way to cover hostnames.")
     else:
@@ -114,6 +123,8 @@ def grade_certificate(host: str, cert: dict, protocol: str | None, verified: boo
         "days_left": days_left,
         "protocol": protocol,
         "verified": verified,
+        "signature_algorithm": cert.get("signatureAlgorithm"),
+        "key_info": cert.get("keyInfo"),
     }
     return {"host": host, "score": score, "grade": grade_for(score), "facts": facts, "findings": findings}
 
@@ -137,12 +148,28 @@ def _cert_dict_from_der(der: bytes) -> dict:
         san = tuple(("DNS", name) for name in san_ext.value.get_values_for_type(x509.DNSName))
     except x509.ExtensionNotFound:
         san = ()
+    try:
+        sig_alg = cert.signature_algorithm_oid._name
+    except Exception:
+        sig_alg = None
+    key_info = None
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        pub = cert.public_key()
+        if isinstance(pub, rsa.RSAPublicKey):
+            key_info = f"RSA {pub.key_size}-bit"
+        elif isinstance(pub, ec.EllipticCurvePublicKey):
+            key_info = f"EC {pub.curve.name} ({pub.key_size}-bit)"
+    except Exception:
+        key_info = None
     return {
         "subject": _name_pairs(cert.subject),
         "issuer": _name_pairs(cert.issuer),
         "subjectAltName": san,
         "notAfter": cert.not_valid_after_utc.strftime("%b %d %H:%M:%S %Y GMT"),
         "notBefore": cert.not_valid_before_utc.strftime("%b %d %H:%M:%S %Y GMT"),
+        "signatureAlgorithm": sig_alg,
+        "keyInfo": key_info,
     }
 
 
@@ -154,7 +181,15 @@ def fetch_certificate(host: str, port: int = 443) -> tuple[dict, str | None, boo
     try:
         with socket.create_connection((host, port), timeout=_TIMEOUT) as sock:
             with verified_ctx.wrap_socket(sock, server_hostname=host) as tls:
-                return tls.getpeercert(), tls.version(), True
+                cert, protocol, der = tls.getpeercert(), tls.version(), tls.getpeercert(binary_form=True)
+                if der:
+                    # getpeercert()'s dict omits signature/key details;
+                    # parse the same certificate for those two facts.
+                    parsed = _cert_dict_from_der(der)
+                    for key in ("signatureAlgorithm", "keyInfo", "notBefore"):
+                        if parsed.get(key):
+                            cert.setdefault(key, parsed[key])
+                return cert, protocol, True
     except ssl.SSLCertVerificationError:
         pass  # fall through to the unverified inspection handshake
     unverified_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)

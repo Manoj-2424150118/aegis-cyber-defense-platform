@@ -128,6 +128,14 @@ FIXES: dict[str, str] = {
     "dmarc-strong": "Keep it: also publish DMARC for every subdomain (sp=reject) and review aggregate reports monthly for new sending services.",
     "dmarc-quarantine": "FIX: When DMARC aggregate reports show all legitimate mail passing, raise the policy from p=quarantine to p=reject for full spoofing protection.",
     "dmarc-monitor": "FIX: Monitor-only DMARC blocks nothing. Review the aggregate reports for 2–4 weeks, fix any legitimate sender that fails, then move to p=quarantine and finally p=reject.",
+    "domain-very-new": "If this is your domain: nothing to fix — but expect receivers to distrust mail from it for the first weeks; warm it up gradually. If it is NOT your domain, treat the newness itself as the warning.",
+    "dangling-cname": "FIX: Remove the CNAME record (or re-create the service resource it points to) TODAY — a dangling CNAME to a multi-tenant service can be claimed by anyone, who then serves content as your subdomain.",
+    "spf-too-many-lookups": "FIX: Flatten the SPF record (replace include chains with ip4/ip6 mechanisms or use an SPF-flattening service) until evaluation needs ≤10 DNS lookups, keeping the -all ending.",
+    "dmarc-partial": "FIX: Once aggregate reports show no legitimate sender failing, raise pct to 100 so the DMARC policy covers every message.",
+    "dmarc-subdomain-gap": "FIX: Set sp=reject in the DMARC record (or delete the sp= tag so subdomains inherit p=) — spoofers specifically hunt for unenforced subdomains.",
+    "dkim-present": "Keep it: rotate DKIM keys yearly and use 2048-bit keys; publish keys for every sending service you use.",
+    "dkim-weak-key": "FIX: Generate a new 2048-bit DKIM keypair, publish it under a NEW selector, switch signing to it, then revoke the weak key after a week.",
+    "dkim-not-detected": "FIX: Enable DKIM signing in your mail platform (Google Workspace / Microsoft 365 both provide it free) and publish the public key at {selector}._domainkey — unsigned mail is far easier to forge convincingly.",
     "caa-present": "Keep it: add a CAA iodef record too, so attempted mis-issuance is reported to you.",
     "caa-missing": "FIX: Publish a CAA record naming only your certificate authority, e.g. `example.com. CAA 0 issue \"letsencrypt.org\"` (plus `0 iodef \"mailto:security@example.com\"`), so no other CA may issue for your domain.",
     # ── TLS inspector (for site owners) ─────────────────────────────
@@ -140,6 +148,8 @@ FIXES: dict[str, str] = {
     "tls-expiry-ok": "Keep it: calendar a renewal check at 30 days remaining, or automate with ACME so it never becomes urgent.",
     "tls-modern-protocol": "Keep it: disable anything below TLS 1.2 at the server so old clients negotiate up or fail closed.",
     "tls-weak-protocol": "FIX: Disable TLS 1.0/1.1 and SSLv3 at the server (nginx: `ssl_protocols TLSv1.2 TLSv1.3;`) — legacy protocols have known attacks (POODLE, BEAST).",
+    "tls-weak-signature": "FIX: Re-issue the certificate with a SHA-256 (or stronger) signature — SHA-1/MD5-signed certificates are distrusted because collisions are practical.",
+    "tls-weak-key": "FIX: Re-issue the certificate with an RSA key of at least 2048 bits or an EC key of at least 256 bits (P-256) — smaller keys are within factoring/discrete-log reach of motivated attackers.",
     "tls-san-present": "Keep it: SANs are the standard — ensure every hostname the site answers on is listed.",
     "tls-no-san": "FIX: Re-issue the certificate with subject-alt-names for every hostname — modern browsers ignore CN-only certificates.",
 }
