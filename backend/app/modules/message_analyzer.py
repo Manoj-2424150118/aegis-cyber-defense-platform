@@ -23,13 +23,22 @@ _BARE_DOMAIN_RE = re.compile(
 )
 _UPI_RE = re.compile(r"\b[\w.\-]{2,}@[a-zA-Z]{2,}\b")
 
-OTP_BAIT = ["otp", "one time password", "share the code", "verification code", "cvv", "atm pin", "your pin", "card number", "net banking password", "internet banking password"]
-KYC_THREATS = ["kyc", "account will be blocked", "account blocked", "sim will be blocked", "sim blocked", "pan card", "aadhaar", "aadhar", "account suspended", "debit card blocked", "credit card blocked", "account will be closed", "update your kyc"]
+OTP_BAIT = ["otp", "one time password", "share the code", "verification code", "cvv", "atm pin", "your pin", "card number", "net banking password", "internet banking password", "otp batao", "otp share karo"]
+# Protective wording banks themselves print — an OTP *mention* inside a
+# disclaimer is a safety feature, not bait. Only an actual request for
+# the code (or bait with no disclaimer anywhere) is scored.
+OTP_REQUEST = ["share your otp", "share the otp", "send the otp", "send otp", "otp batao",
+               "tell me the otp", "enter your otp", "provide the otp", "share otp",
+               "share the code", "share your cvv", "send the code", "enter the code",
+               "your otp is", "otp share karo", "share the verification"]
+OTP_DISCLAIMER = ["never share", "do not share", "don't share", "never asks", "never ask for",
+                  "bank never", "we never", "do not disclose", "never reveal"]
+KYC_THREATS = ["kyc", "account will be blocked", "account blocked", "sim will be blocked", "sim blocked", "pan card", "aadhaar", "aadhar", "account suspended", "debit card blocked", "credit card blocked", "account will be closed", "update your kyc", "account band ho jayega", "band ho jayega", "kyc update karo", "khata band"]
 DIGITAL_ARREST = ["digital arrest", "cbi", "customs department", "cyber cell", "money laundering", "arrest warrant", "police case", "court order", "narcotics", "your parcel", "fedex", "trai", "telecom department"]
-PRIZE_BAIT = ["you have won", "you've won", "lottery", "prize", "cashback", "lucky draw", "winner", "claim your", "free iphone", "free gift", "reward points expire", "kbc"]
+PRIZE_BAIT = ["you have won", "you've won", "lottery", "prize", "cashback", "lucky draw", "winner", "claim your", "free iphone", "free gift", "reward points expire", "kbc", "inaam", "jeet gaye hain"]
 TASK_SCAM = ["telegram", "part time job", "part-time job", "earn per day", "earn daily", "per task", "like and subscribe", "registration fee", "work from home job", "daily income", "₹5000 per day", "rs 5000 per day", "investment plan"]
 CRYPTO_BAIT = ["double your money", "guaranteed returns", "guaranteed profit", "crypto investment", "bitcoin investment", "100% profit", "daily profit", "trading tips", "forex trading"]
-URGENCY = ["urgent", "immediately", "within 24 hours", "today itself", "last chance", "expires today", "act now", "hurry", "final notice", "right now"]
+URGENCY = ["urgent", "immediately", "within 24 hours", "today itself", "last chance", "expires today", "act now", "hurry", "final notice", "right now", "turant", "abhi karo"]
 
 
 def _verdict(score: int) -> str:
@@ -89,7 +98,12 @@ def _stage_links(ctx: _MsgContext) -> None:
 def _stage_harvest(ctx: _MsgContext) -> None:
     hits = ctx.hits(OTP_BAIT)
     if hits:
-        ctx.add(30, "credential-bait", f"The message fishes for secrets ({', '.join(sorted(set(hits)))}) — no bank, company or officer ever asks for an OTP, PIN or CVV by message.")
+        requested = any(p in ctx.lower for p in OTP_REQUEST)
+        disclaimer_only = not requested and any(d in ctx.lower for d in OTP_DISCLAIMER)
+        if not disclaimer_only:
+            ctx.add(30, "credential-bait", f"The message fishes for secrets ({', '.join(sorted(set(hits)))}) — no bank, company or officer ever asks for an OTP, PIN or CVV by message.")
+    if ("call" in ctx.lower or "phone" in ctx.lower) and _PHONE_RE.search(ctx.text):
+        ctx.add(8, "callback-number", "The message pushes you to call a number it supplies — scammers' 'support'/'officer' lines are answered by the scam team itself. Only ever call numbers printed on your card or in the official app.")
     upi = _UPI_RE.findall(ctx.text)
     pay_words = ["pay", "send", "transfer", "deposit", "fee", "charge"]
     if upi and any(w in ctx.lower for w in pay_words):
@@ -110,12 +124,32 @@ def _stage_playbooks(ctx: _MsgContext) -> None:
         ctx.add(18, "crypto-doubling", "Guaranteed-return investment pitch: no legitimate investment guarantees profit — 'double your money' and 'daily profit' offers are always fraud.")
     if "gift card" in ctx.lower:
         ctx.add(18, "giftcard-scam", "The message asks for gift cards — no legitimate organisation is ever paid in gift cards.")
+    if ctx.hits(PARCEL_SCAM):
+        ctx.add(20, "parcel-scam", "Parcel/customs-fee pattern: couriers and customs collect charges through their official channels, never via a link in a random message demanding a small 'clearance fee' — that fee page harvests card details.")
+    if ctx.hits(FAMILY_OPENER) and ctx.hits(FAMILY_ASK):
+        ctx.add(22, "family-emergency", "Family-emergency impersonation: a 'new number' claiming to be a relative in trouble, asking for money and secrecy. Call the relative on their OLD number (or another family member) before sending anything.")
+    if ctx.hits(TECH_SUPPORT):
+        ctx.add(20, "tech-support-scam", "Tech-support scam pattern: no company monitors your device or refunds money over unsolicited calls/messages, and none will ever ask you to install AnyDesk/TeamViewer — that hands them your screen and your banking apps.")
+    loan_hits = ctx.hits(LOAN_SCAM)
+    if len(loan_hits) >= 2 or "processing fee for your loan" in ctx.lower or "loan disbursement fee" in ctx.lower:
+        ctx.add(18, "loan-scam", "Loan-scam pattern: 'instant/pre-approved' loans that demand a processing or disbursement fee up front. Licensed lenders deduct fees from the disbursement — they never collect them by UPI first.")
+    if ctx.hits(INVESTMENT_SCAM):
+        ctx.add(18, "investment-scam", "Unsolicited investment-group/tips pitch: SEBI-registered advisors do not recruit through random WhatsApp/Telegram groups promising assured returns — the 'profits' shown are staged to make you deposit more.")
 
 
 def _stage_pressure(ctx: _MsgContext) -> None:
     hits = ctx.hits(URGENCY)
     if len(hits) >= 2:
         ctx.add(10, "urgency-language", f"Manufactured urgency ({', '.join(sorted(set(hits)))}) — pressure is the payload; real institutions give you time and official channels.")
+
+
+PARCEL_SCAM = ["parcel held", "parcel is held", "customs fee", "pay customs", "delivery failed", "delivery attempt failed", "shipment held", "reschedule your delivery", "india post parcel", "your package is held", "clearance fee"]
+FAMILY_OPENER = ["this is my new number", "my new number", "lost my phone", "changed my number", "hi mum", "hi mom", "hi maa"]
+FAMILY_ASK = ["send money", "need money", "in trouble", "in hospital", "urgent money", "transfer money", "don't tell anyone", "do not tell anyone", "please help"]
+TECH_SUPPORT = ["microsoft support", "your computer has a virus", "computer is infected", "device is hacked", "tech support", "refund department", "install anydesk", "install teamviewer", "download anydesk", "call our support team"]
+LOAN_SCAM = ["instant loan", "loan approved", "pre-approved loan", "no cibil", "loan without documents", "processing fee for your loan", "loan disbursement fee"]
+INVESTMENT_SCAM = ["stock tips", "share market tips", "trading group", "investment group", "ipo allotment", "guaranteed income", "monthly returns assured", "risk free profit", "risk-free returns", "double your investment"]
+_PHONE_RE = re.compile(r"(?:\+\d{1,3}[\s\-]?)?(?:\d[\s\-]?){9,12}\d")
 
 
 MESSAGE_STAGES = [

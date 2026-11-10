@@ -413,6 +413,17 @@ _PATTERN_LABELS = {
     "tracking-params": "Click-tracking parameters (utm / click IDs)",
     "wrapped-destination": "Destinations hidden inside wrapper links",
     "punycode": "Punycode look-alike domains",
+    "unicode-host": "Homograph domains in other alphabets",
+    "mixed-script-host": "Mixed-script homograph domains",
+    "embedded-credentials": "Links with passwords baked in",
+    "free-host-abuse": "Phishing pages on free hosting",
+    "bec-payroll": "Payroll-diversion attempts",
+    "credential-form": "Login forms embedded in emails",
+    "parcel-scam": "Parcel / customs-fee scams",
+    "family-emergency": "Family-emergency impersonation",
+    "tech-support-scam": "Tech-support scams",
+    "loan-scam": "Fake instant-loan offers",
+    "investment-scam": "Investment-group / tips scams",
 }
 
 
