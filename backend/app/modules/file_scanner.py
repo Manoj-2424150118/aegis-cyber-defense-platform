@@ -41,6 +41,7 @@ IOC_PATTERNS = {
     "shell-dropper": re.compile(rb"(curl|wget)\s+[^\n]{0,100}\|\s*(sh|bash)", re.I),
     "base64-pe": re.compile(rb"TVqQ[A-Za-z0-9+/=]{40,}"),  # 'TVqQ' = base64 of 'MZ' header
     "crypto-wallet-address": re.compile(rb"\b(bc1|[13])[a-zA-HJ-NP-Za-km-z]{25,39}\b"),
+    "crypto-wallet-eth": re.compile(rb"\b0x[a-fA-F0-9]{40}\b"),
     "mshta-dropper": re.compile(rb"mshta\s+(https?://|javascript:|vbscript:)", re.I),
     "rundll32-dropper": re.compile(rb"rundll32\s+[^\\n]{0,80}(javascript:|https?://|,)", re.I),
     "amsi-bypass": re.compile(rb"(amsiinitfailed|amsi\.dll|amsibypass|virtualprotect[^\\n]{0,60}amsi)", re.I),
@@ -111,6 +112,11 @@ def _stage_entropy(ctx: _FileContext) -> None:
     if ctx.detected_type.startswith("Legacy Office") or (ctx.expected_exts and ".docx" in ctx.expected_exts):
         if b"vbaProject" in ctx.data or b"Macros" in ctx.data:
             ctx.add(25, "macros-present", "Document carries macros — the #1 ransomware delivery mechanism in email attachments.")
+    if ctx.detected_type.startswith("PDF"):
+        markers = [m for m in (b"/JavaScript", b"/OpenAction", b"/Launch", b"/EmbeddedFile", b"/RichMedia", b"/XFA") if m in ctx.data]
+        if markers:
+            names = ", ".join(m.decode().lstrip("/") for m in markers[:4])
+            ctx.add(20, "pdf-active-content", f"PDF carries active content ({names}) — scripts, auto-run actions and embedded files are how malicious PDFs execute on open. A plain document does not need any of them.")
 
 
 def _stage_ioc(ctx: _FileContext) -> None:
@@ -120,7 +126,7 @@ def _stage_ioc(ctx: _FileContext) -> None:
         count = len(pattern.findall(ctx.data))
         if count:
             ctx.hits[code] = count
-    weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10, "mshta-dropper": 40, "rundll32-dropper": 35, "amsi-bypass": 40, "credential-theft": 45, "exec-policy-bypass": 20, "hidden-window": 15}
+    weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10, "mshta-dropper": 40, "crypto-wallet-eth": 10, "rundll32-dropper": 35, "amsi-bypass": 40, "credential-theft": 45, "exec-policy-bypass": 20, "hidden-window": 15}
     for code, count in ctx.hits.items():
         ctx.add(weights.get(code, 5), code, f"Found {count} indicator(s) of type '{code}' embedded in the file.")
 
@@ -141,6 +147,25 @@ def _stage_archive(ctx: _FileContext) -> None:
             nested_exe = [i.filename for i in zf.infolist() if i.filename.lower().endswith(tuple(DANGEROUS_EXT))]
             if nested_exe:
                 ctx.add(20, "archive-hides-executable", f"Archive hides executable file(s): {', '.join(nested_exe[:3])}.")
+            traversal = [i.filename for i in zf.infolist() if i.filename.startswith(("/", "\\")) or "../" in i.filename or "..\\" in i.filename]
+            if traversal:
+                ctx.add(15, "archive-traversal", f"Archive entries escape the extraction folder ({', '.join(traversal[:3])}) — 'zip-slip' path traversal drops files into startup/system locations on extraction.")
+            nested_archives = [i.filename for i in zf.infolist() if i.filename.lower().endswith((".zip", ".rar", ".7z", ".iso", ".img", ".jar"))]
+            if nested_archives:
+                ctx.add(10, "nested-archive", f"Archive contains nested archive(s) ({', '.join(nested_archives[:3])}) — each layer hides the payload from one more scanner.")
+            if any(i.flag_bits & 0x1 for i in zf.infolist()):
+                ctx.add(15, "encrypted-archive", "Archive entries are password-encrypted, so no scanner (including this one) can see inside — the standard trick for smuggling malware past email gateways. Treat an unexpected encrypted archive as hostile.")
+            # OOXML remote template: the document pulls its real content
+            # (and macros' staging page) from a remote template at open.
+            for info in zf.infolist():
+                if info.filename.endswith(".rels"):
+                    try:
+                        rels = zf.read(info.filename).decode("utf-8", "ignore")
+                    except Exception:
+                        continue
+                    if 'TargetMode="External"' in rels and ("attachedTemplate" in rels or "template" in rels.lower()):
+                        ctx.add(30, "remote-template", "Office document references an EXTERNAL template — Word/Excel will fetch remote content the moment it opens, the classic template-injection malware delivery (the file itself looks clean because the payload lives elsewhere).")
+                        break
     except zipfile.BadZipFile:
         ctx.add(10, "corrupt-archive", "Archive structure is corrupt — sometimes used to evade scanners.")
 

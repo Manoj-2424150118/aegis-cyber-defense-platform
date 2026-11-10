@@ -146,6 +146,11 @@ FIXES: dict[str, str] = {
     "dkim-present": "Keep it: rotate DKIM keys yearly and use 2048-bit keys; publish keys for every sending service you use.",
     "dkim-weak-key": "FIX: Generate a new 2048-bit DKIM keypair, publish it under a NEW selector, switch signing to it, then revoke the weak key after a week.",
     "dkim-not-detected": "FIX: Enable DKIM signing in your mail platform (Google Workspace / Microsoft 365 both provide it free) and publish the public key at {selector}._domainkey — unsigned mail is far easier to forge convincingly.",
+    "pdf-active-content": "Do not open the PDF in a full-featured reader with scripting enabled. Open it in a browser viewer or a hardened reader, or ask the sender for a plain scan/image instead. If you didn't expect the document at all, delete it.",
+    "remote-template": "Do not open this document — its content is fetched from a remote server at open time, which is how template-injection malware lands. Delete it and tell the sender through a separate channel; a legitimate document carries its template inside itself.",
+    "archive-traversal": "Do not extract this archive with a general unzip tool — its entries are written to escape the folder you choose. If the contents are genuinely needed, extract inside an isolated VM/sandbox only.",
+    "nested-archive": "Be suspicious of Russian-doll packaging: extract one layer at a time and re-scan each layer with this tool before opening anything inside.",
+    "encrypted-archive": "If you were not told the password through a separate, trusted channel in advance, delete it — 'password: 1234' for an unexpected encrypted archive is a malware-delivery convention, not a courtesy.",
     "caa-present": "Keep it: add a CAA iodef record too, so attempted mis-issuance is reported to you.",
     "caa-missing": "FIX: Publish a CAA record naming only your certificate authority, e.g. `example.com. CAA 0 issue \"letsencrypt.org\"` (plus `0 iodef \"mailto:security@example.com\"`), so no other CA may issue for your domain.",
     # ── TLS inspector (for site owners) ─────────────────────────────
