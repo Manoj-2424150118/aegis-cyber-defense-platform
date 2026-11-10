@@ -74,6 +74,12 @@ def _stage_sender(ctx: _EmailContext) -> None:
                 break
     if from_domain in FREE_MAIL and any(w in (display.group(1).lower() if display else "") for w in ("bank", "support", "official", "team")):
         ctx.add(15, "freemail-impersonation", "An 'official'-sounding sender is using a free webmail address.")
+    msgid = _header(ctx.raw_headers, "Message-ID")
+    msgid_domain = _domain(msgid)
+    if msgid_domain and from_domain and msgid_domain != from_domain and not msgid_domain.endswith("." + from_domain):
+        ctx.add(10, "messageid-mismatch", f"The Message-ID was minted by {msgid_domain}, not the sender's domain {from_domain} — the message likely did not originate where it claims.")
+    if ctx.raw_headers.strip() and not re.search(r"^Received:", ctx.raw_headers, re.I | re.M):
+        ctx.add(8, "no-received-chain", "The headers contain no Received chain — real mail accumulates Received stamps at every hop. A missing chain means the headers were likely hand-assembled (or stripped before pasting).")
     if any(label.startswith("xn--") for label in from_domain.split(".")):
         ctx.add(25, "homograph-domain", "Sender domain uses punycode — possible homograph impersonation of a real brand.")
 
@@ -90,8 +96,14 @@ def _stage_content(ctx: _EmailContext) -> None:
         ctx.add(30, "credential-bait", f"Message asks for secrets it must never have: {', '.join(bait)}. No legitimate service does this.")
     if any(p in text for p in ("gift card", "gift cards", "google play card", "steam card", "itunes card", "buy bitcoin for", "crypto payment")):
         ctx.add(20, "giftcard-scam", "Message pushes gift-card / crypto payment — the signature of executive-impersonation and tech-support scams.")
-    if any(p in text for p in ("wire transfer", "bank account has changed", "updated bank details", "change of bank account", "keep this confidential", "are you at your desk", "urgent payment")):
+    if any(p in text for p in ("wire transfer", "bank account has changed", "updated bank details", "change of bank account", "keep this confidential", "are you at your desk", "urgent payment", "beneficiary account has changed", "new payment instructions", "remit payment to", "updated remittance")):
         ctx.add(25, "bec-wire", "Message contains payment-diversion language (wire / bank-detail change / secrecy) — the core pattern of BEC fraud that costs companies billions.")
+    payroll_strong = ("direct deposit has changed", "update my direct deposit", "change of payroll", "salary will be paid to a new", "new bank account for my salary", "payroll bank details")
+    payroll_combo = ("payroll" in text or "salary" in text) and any(w in text for w in ("new account", "changed", "update", "different account"))
+    if any(p in text for p in payroll_strong) or payroll_combo:
+        ctx.add(25, "bec-payroll", "Message steers salary/payroll to a different bank account — payroll diversion is one of the highest-loss BEC variants, and real employees' bank changes go through HR systems, never a bare email.")
+    if "<form" in ctx.body.lower() and 'type="password"' in ctx.body.lower().replace("'", '"'):
+        ctx.add(30, "credential-form", "The email itself embeds a login form with a password field — legitimate services never collect credentials inside an email; the form posts your password to the sender.")
 
 
 def _stage_links(ctx: _EmailContext) -> None:
