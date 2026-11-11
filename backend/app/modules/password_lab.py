@@ -140,8 +140,24 @@ def assess_password(password: str) -> dict:
     if len(password) >= 6 and len(set(password)) <= max(2, len(password) // 4):
         score = min(score, 20)
     label = "very weak" if score < 30 else "weak" if score < 50 else "fair" if score < 70 else "strong" if score < 90 else "excellent"
+    # zxcvbn-style reporting layer (spec §5.2): a 0–4 strength score
+    # plus explicit guess estimates per attack scenario. Purely
+    # additive — the long-standing score/label fields are untouched.
+    strength_score = 0 if score < 30 else 1 if score < 50 else 2 if score < 70 else 3 if score < 90 else 4
+    guesses_log10 = round(max(entropy - 1, 0) * math.log10(2), 1)
+
+    def _duration(seconds: float) -> str:
+        return _crack_time(math.log2(seconds * 1e10) + 1) if seconds > 0 else "instantly"
+
+    guesses = 2 ** max(entropy - 1, 0)
     return {
         "score": score, "label": label, "entropy_bits": entropy,
+        "strength_score": strength_score,
+        "guesses_log10": guesses_log10,
+        "crack_times": {
+            "online_throttled": _duration(guesses / (100 / 3600)),   # 100 guesses/hour
+            "offline_fast_hash": _crack_time(entropy),               # 10^10 guesses/s
+        },
         "patterns": [code for code, _issue, _cap in patterns],
         "estimated_crack_time_offline": _crack_time(entropy),
         "issues": issues or ["No issues found. Use a unique password per site, stored in a manager."],

@@ -166,3 +166,19 @@ def test_message_sextortion_and_tax_and_forwarded_playbooks():
     assert "sextortion" in _codes(analyze_message("I have recorded your webcam. Pay or I will share the video with your contacts."))
     assert "tax-refund-scam" in _codes(analyze_message("Your income tax refund is pending. Claim your refund here to receive it."))
     assert "forwarded-chain" in _codes(analyze_message("Forwarded many times: Good morning, share this with 10 friends"))
+
+
+# ── Phase 6: password zxcvbn-style reporting (spec §5.2) ────────────
+
+from app.modules.password_lab import assess_password
+
+
+def test_password_strength_score_and_crack_times_present():
+    weak = assess_password("password")
+    assert weak["strength_score"] == 0
+    strong = assess_password("Tr7!mango-BICYCLE-92#quartz")
+    assert strong["strength_score"] >= 3
+    assert strong["guesses_log10"] > weak["guesses_log10"]
+    assert set(strong["crack_times"]) == {"online_throttled", "offline_fast_hash"}
+    # Legacy contract untouched.
+    assert strong["label"] in ("strong", "excellent") and "score" in strong
