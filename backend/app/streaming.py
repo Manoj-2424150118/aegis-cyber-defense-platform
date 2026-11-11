@@ -72,6 +72,15 @@ async def stream_domain(domain: str):
     classic endpoint returns."""
     yield _sse({"type": "start", "tool": "domain", "total_steps": len(domain_checker.DOMAIN_STAGES)})
     loop = asyncio.get_running_loop()
+    # F-06: same DNS-oracle gate as the classic endpoint — a name that
+    # resolves to a non-public address is refused with a uniform error,
+    # never evaluated (its records would leak internal space).
+    try:
+        await loop.run_in_executor(None, web_audit.assert_public_host, domain)
+    except ValueError as exc:
+        if "non-public address" in str(exc):
+            yield _sse({"type": "error", "message": "Domain resolution refused."})
+            return
     records = await loop.run_in_executor(None, domain_checker.fetch_records, domain)
     gen = domain_checker.iter_domain_stages(domain, records)
     index = 0
