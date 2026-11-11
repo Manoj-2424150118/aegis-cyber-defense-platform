@@ -105,7 +105,15 @@ def test_domain_partial_policies():
     assert "spf-multiple" in {f["code"] for f in domain_checker.evaluate_domain("example.com", rec2)["findings"]}
 
 
+def _public_dns(monkeypatch):
+    import socket as _socket
+
+    from app.modules import web_audit as _wa
+    monkeypatch.setattr(_wa.socket, "getaddrinfo", lambda host, port, family=0, type=0, proto=0, flags=0: [(_socket.AF_INET, _socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))])
+
+
 def test_domain_endpoint_uses_fetch_layer(client, monkeypatch):
+    _public_dns(monkeypatch)
     monkeypatch.setattr(domain_checker, "fetch_records", lambda d: GOOD)
     r = client.post("/api/tools/domain", json={"domain": "example.com"})
     assert r.status_code == 200 and r.json()["score"] == 100
@@ -167,6 +175,7 @@ def test_new_tools_have_fixes_everywhere():
 
 @pytest.mark.parametrize("payload", [{"domain": "exa mple.com"}, {"domain": "https://ok.example.com/path"}])
 def test_domain_schema_whitespace_and_url_form(client, monkeypatch, payload):
+    _public_dns(monkeypatch)
     monkeypatch.setattr(domain_checker, "fetch_records", lambda d: GOOD)
     r = client.post("/api/tools/domain", json=payload)
     if " " in payload["domain"]:
