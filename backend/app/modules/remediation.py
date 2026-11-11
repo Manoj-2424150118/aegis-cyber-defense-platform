@@ -58,6 +58,7 @@ FIXES: dict[str, str] = {
     "spf-missing": "Legitimacy can't be verified from headers alone. Be sceptical of any request: confirm via the sender's official phone number or app before acting.",
     "dkim-missing": "Legitimacy can't be verified from headers alone. Be sceptical of any request: confirm via the sender's official phone number or app before acting.",
     "dmarc-missing": "Legitimacy can't be verified from headers alone. Be sceptical of any request: confirm via the sender's official phone number or app before acting.",
+    "received-private-hop": "Treat the headers as untrustworthy: verify the sender through a channel you already trust, and do not act on payment or credential requests from this message.",
     "reply-to-mismatch": "Your reply would go to a different domain than the sender's — the classic CEO-fraud pattern. Do not reply with data or approvals; forward the email to your IT/security team (or verify by calling the person on a known number).",
     "return-path-mismatch": "The bounce path disagrees with the sender — a spoofing indicator. Verify any request in the message through official channels before acting.",
     "display-name-spoof": "Ignore the friendly display name — trust only the actual address after it. If the domain isn't the organisation's real one, treat the message as impersonation and delete it.",

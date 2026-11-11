@@ -135,3 +135,26 @@ def test_tls_wildcard_and_newly_issued_are_zero_point_notes():
     assert "tls-wildcard" in _codes(noted)
     fresh = grade_certificate("example.com", cert, "TLSv1.3", True, now=datetime(2099, 1, 3, tzinfo=timezone.utc))
     assert "tls-newly-issued" in _codes(fresh)
+
+
+# ── Phase 4: email Received-chain forensics (spec §5.4) ─────────────
+
+def test_email_private_originating_hop_flagged():
+    headers = (
+        "From: Bank <alerts@bank.example.com>\n"
+        "Authentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+        "Received: from mx.bank.example.com (mx.bank.example.com [93.184.216.34]) by mx.google.com\n"
+        "Received: from laptop (unknown [192.168.1.45]) by mx.bank.example.com\n"
+    )
+    r = analyze_email(headers, "Your statement is ready.")
+    assert "received-private-hop" in _codes(r)
+
+
+def test_email_public_origin_not_flagged():
+    headers = (
+        "From: Bank <alerts@bank.example.com>\n"
+        "Authentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+        "Received: from mx.bank.example.com (mx.bank.example.com [93.184.216.34]) by mx.google.com\n"
+    )
+    r = analyze_email(headers, "Your statement is ready.")
+    assert "received-private-hop" not in _codes(r)

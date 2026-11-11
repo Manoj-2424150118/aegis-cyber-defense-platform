@@ -47,7 +47,7 @@ def test_email_stream_parity(client):
     classic = client.post("/api/tools/email", json=payload).json()
     events = _events(client.post("/api/tools/email/stream", json=payload))
     steps = [e for e in events if e["type"] == "step"]
-    assert len(steps) == 5
+    assert len(steps) == 6
     assert events[-1]["result"]["risk_score"] == classic["risk_score"]
     assert events[-1]["result"]["verdict"] == classic["verdict"]
 

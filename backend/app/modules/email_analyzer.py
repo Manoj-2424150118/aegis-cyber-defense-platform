@@ -84,6 +84,28 @@ def _stage_sender(ctx: _EmailContext) -> None:
         ctx.add(25, "homograph-domain", "Sender domain uses punycode — possible homograph impersonation of a real brand.")
 
 
+def _stage_received(ctx: _EmailContext) -> None:
+    """Received-chain forensics (spec §5.4). Only the *originating*
+    (bottom-most, oldest) Received hop is judged: later private hops
+    are common inside big providers' internal relays, but mail that
+    enters the internet from a private/loopback address was injected
+    locally or had its chain hand-assembled."""
+    import ipaddress
+
+    received = re.findall(r"^Received:\s*(.+)$", ctx.raw_headers, re.I | re.M)
+    if not received:
+        return
+    origin = received[-1]
+    for token in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", origin):
+        try:
+            ip = ipaddress.ip_address(token)
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            ctx.add(15, "received-private-hop", f"The mail's originating Received hop is a non-public address ({token}) — genuine internet mail enters through public relays; a private origin suggests forged or locally-injected headers.")
+            return
+
+
 def _stage_content(ctx: _EmailContext) -> None:
     text = ctx.body.lower()
     urgency_hits = [u for u in URGENCY if u in text]
@@ -169,6 +191,7 @@ def _stage_tracking(ctx: _EmailContext) -> None:
 EMAIL_STAGES = [
     ("Verifying sender authentication — SPF · DKIM · DMARC", _stage_auth),
     ("Sender consistency — Reply-To · Return-Path · display name", _stage_sender),
+    ("Received chain — originating hop forensics", _stage_received),
     ("Social-engineering scan — urgency & credential bait", _stage_content),
     ("Link analysis — destinations re-scored by the URL engine", _stage_links),
     ("Tracking & hidden content — pixels, beacons, concealed text", _stage_tracking),
