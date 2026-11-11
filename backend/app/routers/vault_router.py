@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db import get_db
 from app.deps import get_current_user
+from app.entitlements import is_pro
 from app.models import User, VaultItem
 from app.modules import vault as vault_crypto
 from app.schemas import VaultCreateRequest, VaultOpenRequest
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/api/vault", tags=["vault"])
 
 @router.post("", status_code=201)
 def create_item(body: VaultCreateRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if (user.plan or "free") != "pro":
+    if not is_pro(user):
         count = db.query(VaultItem).filter(VaultItem.user_id == user.id).count()
         if count >= settings.vault_free_item_limit:
             raise HTTPException(

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
+from app.entitlements import is_pro
 from app.models import ScanQuota, User
 from app.rate_limit import client_ip
 from app.security import decode_token
@@ -51,7 +52,7 @@ def scan_quota(request: Request, db: Session = Depends(get_db)) -> None:
     if request.method != "POST" or request.url.path == "/api/tools/history":
         return
     user = _optional_user(request, db)
-    if user is not None and (user.plan or "free") == "pro":
+    if user is not None and is_pro(user):
         return
     limit = settings.account_daily_scan_limit if user is not None else settings.anon_daily_scan_limit
     key = _key(request, user)

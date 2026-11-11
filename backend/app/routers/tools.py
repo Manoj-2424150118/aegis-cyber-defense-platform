@@ -19,6 +19,7 @@ from app import streaming
 from app.config import settings
 from app.db import SessionLocal, get_db
 from app.deps import get_current_user
+from app.entitlements import is_pro
 from app.models import ScanEvent, ScanHistory, User
 from app.modules import (
     domain_checker,
@@ -500,7 +501,7 @@ async def trending(db: Session = Depends(get_db)):
 @router.get("/history")
 async def history(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     query = db.query(ScanHistory).filter(ScanHistory.user_id == user.id)
-    if (user.plan or "free") != "pro":  # free accounts keep 30 days of history
+    if not is_pro(user):  # free accounts keep 30 days of history
         from datetime import UTC, datetime, timedelta
 
         query = query.filter(ScanHistory.created_at >= datetime.now(UTC) - timedelta(days=settings.history_free_days))

@@ -48,6 +48,9 @@ def _add_user_columns() -> None:
     existing = {c["name"] for c in inspector.get_columns("users")}
     additions = {
         "plan": "VARCHAR(16) DEFAULT 'free'",
+        "billing_customer_id": "VARCHAR(120)",
+        "billing_subscription_id": "VARCHAR(120)",
+        "plan_period_end": "TIMESTAMP",
         "totp_secret": "VARCHAR(64)",
         "totp_enabled": "BOOLEAN DEFAULT FALSE",
     }

@@ -28,6 +28,11 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     plan: Mapped[str] = mapped_column(String(16), default="free")
+    # Billing linkage (spec §4). Ids only — card data never touches this
+    # service; checkout and payment happen on the provider's hosted page.
+    billing_customer_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    billing_subscription_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    plan_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
@@ -77,6 +82,26 @@ class VaultItem(Base):
     # AES-256-GCM output, base64: nonce || ciphertext || tag. Plaintext never stored.
     ciphertext: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class BillingEvent(Base):
+    """One row per accepted webhook delivery — the idempotency ledger.
+
+    Stores a digest of the payload, never the payload itself: webhook
+    bodies carry customer email addresses this service has no reason
+    to keep a second copy of.
+    """
+
+    __tablename__ = "billing_events"
+    __table_args__ = (UniqueConstraint("provider", "event_id", name="uq_billing_event"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    event_id: Mapped[str] = mapped_column(String(160))
+    event_type: Mapped[str] = mapped_column(String(80), default="")
+    payload_sha256: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[str] = mapped_column(String(40), default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 
 class ScanQuota(Base):

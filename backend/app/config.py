@@ -34,6 +34,27 @@ class Settings(BaseSettings):
     trust_proxy: bool = False  # set True only behind a proxy that sets X-Forwarded-For
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MiB
     hibp_api_url: str = "https://api.pwnedpasswords.com/range/"
+    # Billing (spec §4, docs/FREEMIUM.md) — DISABLED by default. Turning
+    # this on is an owner action: provider account + KYC first, then set
+    # AEGIS_BILLING_ENABLED=true, AEGIS_BILLING_PROVIDER (stripe|razorpay),
+    # AEGIS_BILLING_WEBHOOK_SECRET and the hosted-checkout URLs (Stripe
+    # Payment Links / Razorpay Payment Pages) created in the provider
+    # dashboard. Prices below are display strings only; empty = the plan
+    # is not on sale and the UI must say so.
+    billing_enabled: bool = False
+    billing_provider: str = ""
+    billing_webhook_secret: str = ""
+    billing_checkout_url_monthly: str = ""
+    billing_checkout_url_annual: str = ""
+    pro_price_monthly_display: str = ""
+    pro_price_annual_display: str = ""
+    # External ad network slot (spec §3) — DISABLED by default. The owner
+    # creates the network account; only then are the frame origin (added
+    # to the SPA CSP frame-src) and the slot URL set. Even then the slot
+    # renders only for visitors who consented to third-party content.
+    ads_network_enabled: bool = False
+    ads_network_frame_src: str = ""
+    ads_network_slot_url: str = ""
 
     @field_validator("database_url", mode="before")
     @classmethod

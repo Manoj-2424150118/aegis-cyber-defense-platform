@@ -21,7 +21,7 @@ from app.config import settings
 from app.db import init_db
 from app.headers import SecurityHeadersMiddleware
 from app.rate_limit import RateLimitMiddleware
-from app.routers import auth, tools, vault_router
+from app.routers import auth, billing as billing_router, tools, vault_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("aegis")
@@ -107,6 +107,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(billing_router.router)
 app.include_router(tools.router)
 app.include_router(tools.public_router)
 app.include_router(vault_router.router)
