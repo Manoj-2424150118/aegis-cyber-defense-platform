@@ -318,8 +318,8 @@ export default function App() {
               {version ? `Live · v${version}` : "Checking status…"}
             </span>
             <ThemeToggle />
-            <a className="btn ghost" href="#tool-vault" style={{ minHeight: 40, padding: "0 16px" }}>Sign in</a>
-            <button type="button" className="btn primary" style={{ minHeight: 40, padding: "0 16px", border: 0 }} onClick={focusHero}>Run a free scan</button>
+            <a className="btn ghost btn-sm" href="#tool-vault">Sign in</a>
+            <button type="button" className="btn primary btn-sm" onClick={focusHero}>Run a free scan</button>
             <button
               type="button"
               className="icon-btn nav-toggle"

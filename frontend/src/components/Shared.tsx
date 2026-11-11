@@ -250,7 +250,7 @@ export function ScanTimeline({ scan, error }: { scan: TimelineScanView; error?: 
           <div className="t-step" aria-hidden="true">
             <span className="t-marker active"><span className="t-pulse" /></span>
             <div className="t-step-main">
-              <span className="t-step-label" style={{ color: "var(--text-2)", fontWeight: 500 }}>Working…</span>
+              <span className="t-step-label working">Working…</span>
             </div>
           </div>
         )}

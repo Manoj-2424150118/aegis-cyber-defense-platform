@@ -257,11 +257,11 @@ export function EmailAnalyzer() {
         <span className="tag">Email</span>
       </div>
       <p className="hint">Paste the headers and body. Authentication, spoofing and social engineering are checked live.</p>
-      <div className="field" style={{ marginBottom: 12 }}>
+      <div className="field spaced">
         <span id="emh-label">Email headers</span>
         <textarea value={headers} onChange={(e) => setHeaders(e.target.value)} placeholder={"From: …\nAuthentication-Results: …"} rows={4} aria-labelledby="emh-label" />
       </div>
-      <div className="field" style={{ marginBottom: 12 }}>
+      <div className="field spaced">
         <span id="emb-label">Email body</span>
         <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Email body text or HTML…" rows={4} aria-labelledby="emb-label" />
       </div>
@@ -308,7 +308,7 @@ export function MessageChecker() {
         <span className="tag">Messages</span>
       </div>
       <p className="hint">Paste a suspicious SMS or WhatsApp message — scam playbooks, OTP fishing and every link inside.</p>
-      <div className="field" style={{ marginBottom: 12 }}>
+      <div className="field spaced">
         <span id="msg-label">Message to check</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste the full message here…" rows={5} aria-labelledby="msg-label" />
       </div>
@@ -361,7 +361,7 @@ export function SecretScanner() {
         <span className="tag">Secrets</span>
       </div>
       <p className="hint">Paste a config, code snippet, log or chat excerpt — exposed API keys, tokens, private keys and passwords, found and masked. The text is analysed in memory and never stored; results show masked forms only.</p>
-      <div className="field" style={{ marginBottom: 12 }}>
+      <div className="field spaced">
         <span id="secret-label">Text to scan for leaked secrets</span>
         <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={"Paste a .env, config file, code or logs…"} rows={5} aria-labelledby="secret-label" />
       </div>
