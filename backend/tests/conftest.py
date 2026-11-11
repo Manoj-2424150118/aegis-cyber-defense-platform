@@ -16,6 +16,7 @@ from app.rate_limit import (
     fetch_account_limiter,
     fetch_limiter,
     general_limiter,
+    register_limiter,
 )
 from app.routers import tools as tools_router
 
@@ -29,6 +30,7 @@ def _fresh_state():
     account_limiter.reset()
     fetch_limiter.reset()
     fetch_account_limiter.reset()
+    register_limiter.reset()
     tools_router._recent_events.clear()
     tools_router._signature_events.clear()
     tools_router._last_prune = 0.0
