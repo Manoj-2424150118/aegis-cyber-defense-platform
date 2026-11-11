@@ -231,3 +231,18 @@ def test_audit_weak_csp_flagged_without_score_change():
     assert {"csp-unsafe-inline", "csp-unsafe-eval", "csp-wildcard", "hsts-weak"} <= codes
     assert "csp-unsafe-inline" not in _codes(strong)
     assert weak["score"] == strong["score"]  # notes never move the posture score
+
+
+# ── Phase 9: secret scanner provider formats (spec §5.9) ────────────
+
+def test_secret_scanner_new_provider_formats():
+    blob = (
+        "anthropic = sk-ant-" + "x" * 30 + "\n"
+        "npm = npm_" + "a" * 36 + "\n"
+        "twilio = SK" + "0" * 32 + "\n"
+    )
+    r = scan_secrets(blob)
+    codes = _codes(r)
+    assert {"secret-anthropic-key", "secret-npm-token", "secret-twilio-key"} <= codes
+    import json as _json
+    assert "x" * 30 not in _json.dumps(r)  # masked, never raw

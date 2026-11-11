@@ -54,6 +54,21 @@ _PATTERNS: list[tuple[str, re.Pattern, float, float, bool, str]] = [
     ("secret-test-key",
      re.compile(r"\b[rs]k_test_[A-Za-z0-9]{16,}\b"),
      0.15, 0.9, False, "Stripe TEST key (not a live credential)"),
+    ("secret-openai-key",
+     re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}T3BlbkFJ[A-Za-z0-9_-]{10,}\b"),
+     0.78, 0.95, True, "OpenAI API key"),
+    ("secret-anthropic-key",
+     re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b"),
+     0.78, 0.95, True, "Anthropic API key"),
+    ("secret-npm-token",
+     re.compile(r"\bnpm_[A-Za-z0-9]{36}\b"),
+     0.75, 0.95, True, "npm access token"),
+    ("secret-twilio-key",
+     re.compile(r"\bSK[0-9a-f]{32}\b"),
+     0.70, 0.92, True, "Twilio API key"),
+    ("secret-slack-webhook",
+     re.compile(r"\bhttps://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{24}\b"),
+     0.60, 0.95, True, "Slack incoming-webhook URL"),
 ]
 
 _ASSIGNMENT = re.compile(
@@ -65,7 +80,8 @@ _CARD = re.compile(r"\b(?:\d[ -]?){12,18}\d\b")
 _SEED_LABEL = re.compile(r"(?i)\b(seed phrase|mnemonic|recovery phrase|secret recovery)\b")
 _STRONG_CODES = {"secret-private-key", "secret-aws-key", "secret-github-token",
                  "secret-stripe-key", "secret-db-uri", "secret-slack-token",
-                 "secret-sendgrid-key"}
+                 "secret-sendgrid-key", "secret-openai-key", "secret-anthropic-key",
+                 "secret-npm-token", "secret-twilio-key", "secret-slack-webhook"}
 
 
 def _entropy(text: str) -> float:
