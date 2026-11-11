@@ -9,10 +9,21 @@ global per-signature ceiling (20/hour, source-independent) and the
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
+from app.config import settings
 from app.db import SessionLocal
 from app.models import ScanEvent
 
 PHISH = {"url": "http://paypa1-secure-login.xyz/verify?account=suspended"}
+
+
+@pytest.fixture(autouse=True)
+def _trust_proxy(monkeypatch):
+    # Distinct sources are only distinguishable when the proxy chain is
+    # trusted (the repo pattern: tests opt in explicitly, production
+    # defaults to not trusting X-Forwarded-For).
+    monkeypatch.setattr(settings, "trust_proxy", True)
 
 
 def _post_from(client, payload, ip):
@@ -45,12 +56,18 @@ def test_signature_ceiling_is_per_signature_not_global_lockout(client):
     # Saturating one signature must not suppress a different one.
     for i in range(22):
         _post_from(client, PHISH, f"198.51.100.{i + 1}")
+    before = client.get("/api/public/trending").json()["flagged"]
+    assert before == 20  # first signature is capped
     other = {"url": "http://secure-paypa1-login.xyz/verify?account=suspended"}
     resp = _post_from(client, other, "198.51.100.200")
     assert resp.status_code == 200
-    out = client.get("/api/public/trending").json()
-    domains = {d["domain"]: d["count"] for d in out["top_flagged_domains"]}
-    assert domains.get("secure-paypa1-login.xyz") == 1
+    # (top_flagged_domains only lists domains with count >= 2, so the
+    # proof is the flagged total moving by exactly one.)
+    from app.routers import tools as tools_router
+
+    tools_router._trending_cache = None  # bypass the response cache
+    after = client.get("/api/public/trending").json()["flagged"]
+    assert after == before + 1
 
 
 def test_old_events_fall_out_of_the_window_and_get_pruned(client):
