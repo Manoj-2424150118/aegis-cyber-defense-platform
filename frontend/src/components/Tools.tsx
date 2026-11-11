@@ -51,7 +51,7 @@ export function UrlChecker() {
     <section className="card" id="tool-url">
       <div className="card-head">
         <span className="tile"><LinkIcon size={20} /></span>
-        <h2>Phishing Link Checker</h2>
+        <h3 className="card-title">Phishing Link Checker</h3>
         <span className="tag">Links</span>
       </div>
       <p className="hint">Paste any link before you open it. It is checked live, signal by signal.</p>
@@ -137,7 +137,7 @@ export function PasswordLab() {
     <section className="card" id="tool-password">
       <div className="card-head">
         <span className="tile"><KeyIcon size={20} /></span>
-        <h2>Password Lab</h2>
+        <h3 className="card-title">Password Lab</h3>
         <span className="tag">Passwords</span>
       </div>
       <p className="hint">Strength, crack-time and breach exposure, streamed live. Only 5 hash characters ever leave your browser for the breach check.</p>
@@ -197,7 +197,7 @@ export function FileScanner() {
     <section className="card" id="tool-file">
       <div className="card-head">
         <span className="tile"><FileSearchIcon size={20} /></span>
-        <h2>File Malware Scanner</h2>
+        <h3 className="card-title">File Malware Scanner</h3>
         <span className="tag">Files</span>
       </div>
       <p className="hint">Static malware triage, stage by stage. Files are analysed in memory — never executed, never stored.</p>
@@ -253,7 +253,7 @@ export function EmailAnalyzer() {
     <section className="card" id="tool-email">
       <div className="card-head">
         <span className="tile"><MailIcon size={20} /></span>
-        <h2>Phishing Email Analyser</h2>
+        <h3 className="card-title">Phishing Email Analyser</h3>
         <span className="tag">Email</span>
       </div>
       <p className="hint">Paste the headers and body. Authentication, spoofing and social engineering are checked live.</p>
@@ -304,7 +304,7 @@ export function MessageChecker() {
     <section className="card" id="tool-message">
       <div className="card-head">
         <span className="tile"><MessageIcon size={20} /></span>
-        <h2>Scam Message Checker</h2>
+        <h3 className="card-title">Scam Message Checker</h3>
         <span className="tag">Messages</span>
       </div>
       <p className="hint">Paste a suspicious SMS or WhatsApp message — scam playbooks, OTP fishing and every link inside.</p>
@@ -357,7 +357,7 @@ export function SecretScanner() {
     <section className="card" id="tool-secret">
       <div className="card-head">
         <span className="tile"><EyeOffIcon size={20} /></span>
-        <h2>Secret Scanner</h2>
+        <h3 className="card-title">Secret Scanner</h3>
         <span className="tag">Secrets</span>
       </div>
       <p className="hint">Paste a config, code snippet, log or chat excerpt — exposed API keys, tokens, private keys and passwords, found and masked. The text is analysed in memory and never stored; results show masked forms only.</p>
@@ -406,7 +406,7 @@ export function DomainChecker() {
     <section className="card" id="tool-domain">
       <div className="card-head">
         <span className="tile"><ServerIcon size={20} /></span>
-        <h2>Domain Security Checker</h2>
+        <h3 className="card-title">Domain Security Checker</h3>
         <span className="tag">Domains</span>
       </div>
       <p className="hint">Can anyone email as this domain? SPF, DMARC, CAA and DNS health — graded live.</p>
@@ -452,7 +452,7 @@ export function TlsInspector() {
     <section className="card" id="tool-tls">
       <div className="card-head">
         <span className="tile"><LockIcon size={20} /></span>
-        <h2>TLS Certificate Inspector</h2>
+        <h3 className="card-title">TLS Certificate Inspector</h3>
         <span className="tag">Certificates</span>
       </div>
       <p className="hint">Issuer, expiry, hostname coverage and protocol — graded from a real TLS handshake.</p>
@@ -504,7 +504,7 @@ export function WebAudit() {
     <section className="card" id="tool-web">
       <div className="card-head">
         <span className="tile"><GlobeIcon size={20} /></span>
-        <h2>Website Safety Audit</h2>
+        <h3 className="card-title">Website Safety Audit</h3>
         <span className="tag">Websites</span>
       </div>
       <p className="hint">Grades a site's HTTPS, headers and cookies — live. Internal addresses are refused.</p>

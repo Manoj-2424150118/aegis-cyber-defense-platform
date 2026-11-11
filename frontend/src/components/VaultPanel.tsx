@@ -133,7 +133,7 @@ export function VaultPanel() {
       <section className="card" id="tool-vault">
         <div className="card-head">
           <span className="tile"><LockIcon size={20} /></span>
-          <h2>Encrypted Vault</h2>
+          <h3 className="card-title">Encrypted Vault</h3>
           <span className="tag">Vault</span>
         </div>
         <p className="hint">Recovery codes, PINs and notes, encrypted with AES-256-GCM. The server only ever sees ciphertext.</p>
@@ -160,7 +160,7 @@ export function VaultPanel() {
     <section className="card" id="tool-vault">
       <div className="card-head">
         <span className="tile"><LockIcon size={20} /></span>
-        <h2>Encrypted Vault</h2>
+        <h3 className="card-title">Encrypted Vault</h3>
         <span className="tag">Vault</span>
       </div>
       <p className="hint">Your master password encrypts and decrypts items on this device. It is never sent to or stored by the server — if you forget it, items cannot be recovered.</p>
