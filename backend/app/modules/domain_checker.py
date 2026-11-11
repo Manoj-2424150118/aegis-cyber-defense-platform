@@ -10,9 +10,7 @@ of the record set) so the rubric is unit-tested without any network.
 """
 
 import base64
-import json
 import re
-import urllib.request
 from datetime import datetime, timezone
 
 import dns.exception
@@ -70,20 +68,23 @@ def _dkim_probe(resolver: dns.resolver.Resolver, domain: str) -> list[dict]:
 
 def _rdap_created(domain: str) -> str | None:
     """Registration date from the public RDAP directory (rdap.org
-    redirects to the authoritative registrar RDAP). Best-effort: any
-    failure returns None and the checker simply says less."""
-    try:
-        req = urllib.request.Request(
-            f"https://rdap.org/domain/{domain}",
-            headers={"User-Agent": "Aegis-Domain-Checker/2.0", "Accept": "application/rdap+json"},
-        )
-        with urllib.request.urlopen(req, timeout=4) as resp:  # nosec B310 - fixed public directory host, domain is format-validated
-            data = json.loads(resp.read(262144))
-        for event in data.get("events", []):
-            if event.get("eventAction") in ("registration", "registered"):
-                return str(event.get("eventDate"))[:10]
-    except Exception:
+    redirects to the authoritative registrar RDAP). Routed through the
+    shared enrichment layer (24 h cache + circuit breaker): a down or
+    rate-limiting directory degrades to None and the checker simply
+    says less — it never fails the scan."""
+    from app.modules.enrichment import fetch_json, rdap_breaker, rdap_cache
+
+    data = fetch_json(
+        f"https://rdap.org/domain/{domain}",
+        timeout=4,
+        headers={"User-Agent": "Aegis-Domain-Checker/2.0", "Accept": "application/rdap+json"},
+        cache=rdap_cache, breaker=rdap_breaker,
+    )
+    if not data:
         return None
+    for event in data.get("events", []):
+        if event.get("eventAction") in ("registration", "registered"):
+            return str(event.get("eventDate"))[:10]
     return None
 
 
