@@ -16,7 +16,7 @@
 
 **Repository:** [github.com/Manoj-2424150118/aegis-cyber-defense-platform](https://github.com/Manoj-2424150118/aegis-cyber-defense-platform)
 
-<p align="center"><img src="docs/demo.gif" alt="Aegis demo — home, the nine tools, and Smart Scan verdicts" width="420"/></p>
+<p align="center"><img src="docs/demo.gif" alt="Aegis demo — home, the ten tools, and Smart Scan verdicts" width="420"/></p>
 
 ---
 
@@ -42,7 +42,7 @@ Built by [Manoj Kumar Sharma](https://github.com/Manoj-2424150118) — Cybersecu
 
 ---
 
-## The nine protection tools
+## The ten protection tools
 
 | # | Threat | Tool | What it detects / does |
 |---|---|---|---|
@@ -55,8 +55,9 @@ Built by [Manoj Kumar Sharma](https://github.com/Manoj-2424150118) — Cybersecu
 | 7 | MITM & unsafe websites | **Website Audit** | Grades any site A–F on HTTPS/HSTS, CSP, X-Frame-Options, MIME-sniffing, Referrer/Permissions policy and cookie flags (Secure/HttpOnly/SameSite) |
 | 8 | Domain spoofing | **Domain Security Checker** | Live DNS grading of any domain: A/AAAA liveness, MX, SPF (including invalid multiple records and `~all` softfail), DMARC policy strength (none → quarantine → reject) and CAA issuance control |
 | 9 | Expired / mismatched certificates | **TLS Certificate Inspector** | Real TLS handshake: chain verification, hostname/SAN coverage (with wildcards), expiry runway, protocol version — with an unverified re-handshake to report broken certificates instead of hiding them |
+| 10 | Leaked credentials in pasted text | **Secret Scanner** | Provider credential formats (AWS, GitHub, Slack, Stripe, SendGrid, Google), private-key blocks, credentialed database URIs, JWTs, Luhn-valid card numbers and high-entropy secret assignments — scored with a noisy-OR model; the secret itself is never returned, logged or stored, only a masked form |
 
-**Smart Scan** (`POST /api/tools/smart-scan`) sits above all nine: it classifies pasted content and routes it to the right engine.
+**Smart Scan** (`POST /api/tools/smart-scan`) sits above all ten: it classifies pasted content and routes it to the right engine.
 
 ---
 
@@ -185,6 +186,7 @@ curl -s -X POST localhost:8000/api/tools/url \
 | POST | `/api/tools/message` | – | Scam SMS/WhatsApp message analysis |
 | POST | `/api/tools/domain` | – | Domain SPF/DMARC/CAA security grade |
 | POST | `/api/tools/tls` | – | TLS certificate inspection |
+| POST | `/api/tools/secret-scan` | – | Leaked-credential scan of pasted text; masked findings only, secret never returned |
 | GET | `/api/public/trending` | – | Scam trends from privacy-safe scan aggregates |
 | POST | `/api/auth/register` · `/login` · `/refresh` | – | Argon2id + JWT auth with lockout |
 | GET/POST/DELETE | `/api/vault` | JWT | Encrypted vault CRUD |
@@ -196,9 +198,10 @@ Every tool also has a `/stream` variant that returns the same result over Server
 ## Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 169 tests: engines, crypto, API, lockout, headers,
+cd backend && pytest -q --cov=app     # 186 tests: engines, crypto, API, lockout, headers,
                                        # streaming parity, remediation, validation,
-                                       # trackers, redirect tracer, trends, smart scan
+                                       # trackers, redirect tracer, trends, smart scan,
+                                       # secret scan
 cd frontend && npm run build           # strict TypeScript + production build
 ```
 
