@@ -625,6 +625,10 @@ footer { margin-top: 96px; border-top: 1px solid var(--line); }
   .reveal { opacity: 1; transform: none; }
   .spinner { animation: none; }
 }
+@media (prefers-contrast: more) {
+  :root { --text-3: #98A199; --line: #353C37; --line-strong: #4A524C; }
+  :root[data-theme="light"] { --text-3: #4B5149; --line: #C4BFB2; --line-strong: #8A8674; }
+}
 @media (forced-colors: active) {
   .card, .hero-panel, .timeline, .trend-card, .trend-stat, .cover-card, .step-card, .faq-item, .privacy-item { border: 1px solid CanvasText; }
   .badge::before, .sev-dot, .live-dot { forced-color-adjust: none; }
