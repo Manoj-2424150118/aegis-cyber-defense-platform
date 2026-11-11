@@ -377,8 +377,8 @@ export default function App() {
             <p className="hero-eyebrow">Personal cyber defense, without the noise.</p>
             <h1>Check it first. <span className="quiet">Open it safely.</span></h1>
             <p className="sub">
-              Ten free checks for the links, emails, messages, files, passwords and pasted configs that reach
-              you every day — each one explained, signal by signal.
+              Ten free checks for suspicious links, emails, messages, files and passwords — every result
+              explained, signal by signal.
             </p>
             <form
               className="command-bar"
