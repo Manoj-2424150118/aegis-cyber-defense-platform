@@ -91,11 +91,12 @@ def _worker_constraint_warning() -> str | None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Log only the mode as a literal: interpolating settings values here
+    # trips clear-text-logging scanners (the settings object also holds
+    # the secret key), and the hop count adds nothing operationally.
     logger.info(
         "rate-limit client IP source: %s",
-        f"proxy-chain (trusted hops={settings.trusted_proxy_hops})"
-        if settings.trust_proxy
-        else "socket-peer",
+        "proxy-chain" if settings.trust_proxy else "socket-peer",
     )
     warning = _worker_constraint_warning()
     if warning:
