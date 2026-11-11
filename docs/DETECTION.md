@@ -124,3 +124,36 @@ false-positive guard, file-format detectors, secret-scanner redaction
 and noisy-OR compounding, password pattern caps, and determinism
 (same input → same score and findings). It runs in CI with the rest
 of the suite.
+
+## Calibration (phase 11)
+
+The offline engines ship with a labelled golden corpus
+(`backend/tests/golden_corpus.json`, 59 samples) and an evaluation
+harness (`scripts/eval_detection.py`, also enforced as a pytest
+release gate in `tests/test_eval_corpus.py`).
+
+**Measured on the corpus (2026-11-11): precision 1.00, recall 1.00,
+false-positive rate 0.00** — gate: recall ≥ 0.90, FPR ≤ 0.05.
+Thresholds: score ≥ 40 counts as a positive for URL/message/email/
+secret, ≥ 20 for file, and password positives are "flagged weak"
+(score < 50). Network engines are excluded — their inputs are live
+state, covered by their own unit tests.
+
+Calibration findings that changed the engines (all deliberate,
+all covered by tests):
+
+1. **Regional brand domains were false positives.** amazon.in,
+   amazon.co.uk, google.co.in scored 35 (`brand-in-host`) because
+   each brand mapped to a single official domain. Brands now carry
+   their full official domain set.
+2. **Single-playbook scams scored below "caution".** A textbook
+   digital-arrest or payroll-diversion message scored 20–30.
+   Unambiguous playbook signatures now floor at 40 (hard-rule
+   floors, §4); `kyc-threat` is excluded because banks send genuine
+   KYC reminders.
+3. **"Your parcel" was a false-positive machine.** The phrase sat
+   in the digital-arrest list and flagged every delivery update.
+   Removed; the scam is still caught by its agency vocabulary.
+4. **OTP *delivery* looked like OTP *bait*.** A bank's own OTP
+   message (code + do-not-share disclaimer, no request) no longer
+   triggers `credential-bait`.

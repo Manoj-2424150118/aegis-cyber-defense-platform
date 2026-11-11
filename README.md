@@ -198,7 +198,7 @@ Every tool also has a `/stream` variant that returns the same result over Server
 ## Testing & quality
 
 ```bash
-cd backend && pytest -q --cov=app     # 186 tests: engines, crypto, API, lockout, headers,
+cd backend && pytest -q --cov=app     # 213 tests: engines, crypto, API, lockout, headers,
                                        # streaming parity, remediation, validation,
                                        # trackers, redirect tracer, trends, smart scan,
                                        # secret scan

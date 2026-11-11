@@ -289,3 +289,23 @@ def test_qr_endpoint_is_honest_when_no_decoder(client):
     # degraded + inconclusive, never a fabricated 'safe'.
     assert body["verdict"] == "inconclusive" and body["risk_score"] is None
     assert body["meta"]["degraded"] is True
+
+
+# ── Phase 11: calibration corpus gates (spec §10) ───────────────────
+
+def test_otp_delivery_message_is_not_bait():
+    r = analyze_message("Your OTP is 482913 for the transaction. Do not share it with anyone. - HDFC Bank")
+    assert "credential-bait" not in _codes(r)
+    assert r["risk_score"] < 40
+
+
+def test_legit_parcel_delivery_is_not_digital_arrest():
+    r = analyze_message("Your parcel will arrive tomorrow between 10 am and 2 pm.")
+    assert "digital-arrest" not in _codes(r)
+    assert r["risk_score"] < 20
+
+
+def test_playbook_floor_lifts_unambiguous_scams_to_caution():
+    assert analyze_message("You are under digital arrest for money laundering.")["risk_score"] >= 40
+    assert analyze_email("From: HR <hr@company.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n",
+                         "Please update my direct deposit — salary will be paid to a new account.")["risk_score"] >= 40

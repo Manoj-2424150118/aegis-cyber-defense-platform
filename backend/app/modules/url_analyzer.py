@@ -26,12 +26,19 @@ from app.modules.remediation import fix_for
 
 SUSPICIOUS_TLDS = {"zip", "mov", "top", "xyz", "click", "loan", "men", "gq", "cf", "tk", "ml", "work", "party", "review", "science", "trade", "date", "faith", "accountant", "download", "racing", "win", "vip", "best", "live", "sbs", "cyou", "bond", "cfd", "quest"}
 SHORTENERS = {"bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly", "cutt.ly", "rebrand.ly", "shorturl.at", "rb.gy", "t.ly"}
+# Brand -> its official registrable domains. Regional domains are
+# first-class: amazon.in and google.co.in are the brands' real homes,
+# and flagging them as impersonation was a measured false positive
+# (see the phase-11 calibration corpus in tests/golden_corpus.json).
 BRANDS = {
-    "paypal": "paypal.com", "apple": "apple.com", "microsoft": "microsoft.com",
-    "google": "google.com", "amazon": "amazon.com", "netflix": "netflix.com",
-    "facebook": "facebook.com", "instagram": "instagram.com", "whatsapp": "whatsapp.com",
-    "sbi": "sbi.co.in", "hdfc": "hdfcbank.com", "icici": "icicibank.com",
-    "paytm": "paytm.com", "phonepe": "phonepe.com", "upi": "npci.org.in",
+    "paypal": ("paypal.com",), "apple": ("apple.com",), "microsoft": ("microsoft.com",),
+    "google": ("google.com", "google.co.in", "google.co.uk", "google.de", "google.ca", "google.com.au"),
+    "amazon": ("amazon.com", "amazon.in", "amazon.co.uk", "amazon.de", "amazon.ca", "amazon.com.au", "amazon.co.jp"),
+    "netflix": ("netflix.com",),
+    "facebook": ("facebook.com", "fb.com"), "instagram": ("instagram.com",),
+    "whatsapp": ("whatsapp.com", "wa.me"),
+    "sbi": ("sbi.co.in",), "hdfc": ("hdfcbank.com",), "icici": ("icicibank.com",),
+    "paytm": ("paytm.com",), "phonepe": ("phonepe.com",), "upi": ("npci.org.in",),
 }
 # Query parameters whose only job is to track the clicker across sites.
 # They carry no content, so the report names them and offers a cleaned
@@ -272,8 +279,10 @@ def _stage_brand(ctx: _UrlContext) -> None:
     # Typosquatters hide behind hyphenated padding (paypa1-secure-login), so
     # compare both the full SLD and each hyphen-separated token.
     candidates = {sld, *sld.split("-")} if sld else set()
-    for brand, official in BRANDS.items():
-        if (brand in host or brand in leet) and registrable != official and not host.endswith("." + official):
+    for brand, officials in BRANDS.items():
+        official = officials[0]
+        is_official = registrable in officials or any(host.endswith("." + o) for o in officials)
+        if (brand in host or brand in leet) and not is_official:
             ctx.add(35, "brand-in-host", f"Domain imitates '{brand}' but is not the official {official}.")
         elif any(c and c != brand and _levenshtein(c, brand) in (1, 2) for c in candidates) and len(brand) >= 4:
             ctx.add(30, "typosquat", f"Domain '{sld}' is a near-miss spelling of '{brand}' (typosquatting).")
@@ -284,9 +293,9 @@ def _stage_brand(ctx: _UrlContext) -> None:
     if registrable and sld:
         skeleton = _skeleton(sld)
         if skeleton != sld:
-            for brand, official in BRANDS.items():
-                if skeleton == brand and registrable != official and not host.endswith("." + official):
-                    ctx.add(30, "homograph-host", f"Domain '{sld}' is built from look-alike foreign-script characters that render as '{brand}' — a homograph impersonation of {official}.")
+            for brand, officials in BRANDS.items():
+                if skeleton == brand and not (registrable in officials or any(host.endswith("." + o) for o in officials)):
+                    ctx.add(30, "homograph-host", f"Domain '{sld}' is built from look-alike foreign-script characters that render as '{brand}' — a homograph impersonation of {officials[0]}.")
                     break
 
 
@@ -411,8 +420,8 @@ def impersonated_brand(raw_url: str) -> str | None:
     leet = host.translate(str.maketrans({"0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a"}))
     sld = labels[-2] if len(labels) >= 2 else ""
     candidates = {sld, *sld.split("-")} if sld else set()
-    for brand, official in BRANDS.items():
-        if registrable == official or host.endswith("." + official):
+    for brand, officials in BRANDS.items():
+        if registrable in officials or any(host.endswith("." + o) for o in officials):
             continue
         if brand in host or brand in leet:
             return brand

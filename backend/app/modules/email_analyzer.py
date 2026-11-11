@@ -219,6 +219,13 @@ def analyze_email(raw_headers: str, body: str = "") -> dict:
             ctx = stop.value
             break
     score = min(ctx.score, 100)
+    # Hard floor (spec §4/§5.4): payment-diversion and credential-
+    # harvesting signatures are unambiguous — a payroll-diversion or
+    # embedded-login-form email is at least "suspicious" on that
+    # evidence alone, however polite the rest of the message is.
+    if any(f["code"] in ("bec-wire", "bec-payroll", "credential-form", "credential-bait", "malicious-link")
+           for f in ctx.findings):
+        score = max(score, 40)
     verdict = "malicious" if score >= 70 else "suspicious" if score >= 40 else "low-risk" if score >= 20 else "likely-safe"
     findings = list(ctx.findings)
     if not findings:

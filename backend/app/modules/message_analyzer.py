@@ -34,7 +34,12 @@ OTP_REQUEST = ["share your otp", "share the otp", "send the otp", "send otp", "o
 OTP_DISCLAIMER = ["never share", "do not share", "don't share", "never asks", "never ask for",
                   "bank never", "we never", "do not disclose", "never reveal"]
 KYC_THREATS = ["kyc", "account will be blocked", "account blocked", "sim will be blocked", "sim blocked", "pan card", "aadhaar", "aadhar", "account suspended", "debit card blocked", "credit card blocked", "account will be closed", "update your kyc", "account band ho jayega", "band ho jayega", "kyc update karo", "khata band"]
-DIGITAL_ARREST = ["digital arrest", "cbi", "customs department", "cyber cell", "money laundering", "arrest warrant", "police case", "court order", "narcotics", "your parcel", "fedex", "trai", "telecom department"]
+# NOTE: bare "your parcel" / "fedex" were removed from this list in
+# the phase-11 calibration: every genuine delivery notification says
+# "your parcel", which made the phrase a false-positive machine. The
+# arrest scam is still caught by its agency/threat vocabulary, and
+# parcel-fee lures by PARCEL_SCAM below.
+DIGITAL_ARREST = ["digital arrest", "cbi", "customs department", "cyber cell", "money laundering", "arrest warrant", "police case", "court order", "narcotics", "trai", "telecom department"]
 PRIZE_BAIT = ["you have won", "you've won", "lottery", "prize", "cashback", "lucky draw", "winner", "claim your", "free iphone", "free gift", "reward points expire", "kbc", "inaam", "jeet gaye hain"]
 TASK_SCAM = ["telegram", "part time job", "part-time job", "earn per day", "earn daily", "per task", "like and subscribe", "registration fee", "work from home job", "daily income", "₹5000 per day", "rs 5000 per day", "investment plan"]
 CRYPTO_BAIT = ["double your money", "guaranteed returns", "guaranteed profit", "crypto investment", "bitcoin investment", "100% profit", "daily profit", "trading tips", "forex trading"]
@@ -104,6 +109,18 @@ def _stage_harvest(ctx: _MsgContext) -> None:
             if not any(d in sent for d in OTP_DISCLAIMER)]
     cleaned = " ".join(kept)
     hits = [p for p in OTP_BAIT if p in cleaned]
+    # OTP *delivery* is not bait: a genuine bank message contains the
+    # code plus a do-not-share disclaimer and asks for nothing. When
+    # the whole message is that shape (code present, disclaimer
+    # present, no request verb surviving in the kept text), the bait
+    # phrases are the bank's own wording — do not score them.
+    delivery_shape = (
+        any(d in ctx.lower for d in OTP_DISCLAIMER)
+        and re.search(r"\b\d{4,8}\b", ctx.text)
+        and not any(v in cleaned for v in ("share", "send", "enter", "provide", "tell me", "batao", "forward"))
+    )
+    if hits and delivery_shape:
+        hits = []
     if hits:
         ctx.add(30, "credential-bait", f"The message fishes for secrets ({', '.join(sorted(set(hits)))}) — no bank, company or officer ever asks for an OTP, PIN or CVV by message.")
     if ("call" in ctx.lower or "phone" in ctx.lower) and _PHONE_RE.search(ctx.text):
@@ -181,6 +198,22 @@ def iter_message_stages(text: str):
     return ctx
 
 
+# Playbook signatures that are, on their own, unambiguous scam
+# evidence — there is no legitimate version of a "digital arrest" or
+# a sextortion demand. Per the scoring model (spec §4), hard rules
+# floor the score: one confirmed playbook match is at least
+# "caution", however quiet the rest of the message is. (kyc-threat is
+# deliberately excluded — banks do send genuine KYC reminders, so it
+# must corroborate before it can carry a verdict.)
+PLAYBOOK_FLOOR_CODES = {
+    "digital-arrest", "task-scam", "prize-scam", "crypto-doubling",
+    "giftcard-scam", "parcel-scam", "family-emergency", "tech-support-scam",
+    "loan-scam", "investment-scam", "sextortion", "tax-refund-scam",
+    "credential-bait", "malicious-link",
+}
+PLAYBOOK_FLOOR = 40
+
+
 def analyze_message(text: str) -> dict:
     import time
     started = time.perf_counter()
@@ -193,6 +226,8 @@ def analyze_message(text: str) -> dict:
             ctx = stop.value
             break
     score = min(ctx.score, 100)
+    if any(f["code"] in PLAYBOOK_FLOOR_CODES for f in ctx.findings):
+        score = max(score, PLAYBOOK_FLOOR)
     findings = list(ctx.findings)
     if not findings:
         findings.append({"points": 0, "code": "clean", "message": "No known scam patterns detected in this message.", "fix": fix_for("clean")})
