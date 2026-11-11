@@ -32,6 +32,7 @@ _CATEGORY_BY_CODE = {
     "brand-in-host": "brand_impersonation", "brand-in-path": "brand_impersonation",
     "typosquat": "brand_impersonation", "punycode": "brand_impersonation",
     "unicode-host": "brand_impersonation", "mixed-script-host": "brand_impersonation",
+    "homograph-host": "brand_impersonation",
     "homograph-domain": "brand_impersonation", "display-name-spoof": "brand_impersonation",
     "freemail-impersonation": "brand_impersonation", "free-host-abuse": "brand_impersonation",
     # host / network structure

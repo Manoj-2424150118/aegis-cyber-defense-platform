@@ -31,6 +31,7 @@ FIXES: dict[str, str] = {
     "embedded-credentials": "Never follow a link that carries a username/password inside it. Delete the message; if the account is real, sign in via the official app — and change that password, since it has now been shared in plain text.",
     "unicode-host": "The domain only *looks* like the brand — its characters come from another alphabet. Type the official address yourself; a password manager also refuses to autofill on look-alike domains, which is a useful tripwire.",
     "mixed-script-host": "This domain mixes alphabets to impersonate a real brand at a glance. Do not proceed: close the page and navigate to the service by typing its real address.",
+    "homograph-host": "The domain is spelled with foreign-script characters chosen to look exactly like the brand. Do not proceed: type the official address yourself, and prefer a password manager — it will not autofill on a look-alike.",
     "free-host-abuse": "Free-hosted pages cost nothing to create and are abandoned in hours — the standard phishing-page lifecycle. Do not enter credentials; verify the claim inside the brand's official app.",
     "double-encoded": "Double encoding exists to hide a payload from filters. Do not visit; delete the message.",
     "userinfo-trick": "Everything before the '@' is ignored by browsers — the real destination is what follows it, and it isn't who you think. Do not proceed.",

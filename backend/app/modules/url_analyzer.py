@@ -69,10 +69,39 @@ _INVISIBLE = dict.fromkeys(
     [ord(c) for c in "\u200b\u200c\u200d\ufeff\u202a\u202b\u202c\u202d\u202e\u2060\u00ad"], None)
 
 
+# Characters browsers silently delete from URLs before parsing —
+# including inside the scheme, which is how "java\tscript:" slips past
+# filters that look for the literal word while the browser still runs it.
+_BROWSER_STRIPPED = dict.fromkeys([0x09, 0x0A, 0x0D], None)
+
+
 def _normalize(text: str) -> str:
     """NFKC + strip invisible characters, so analysis sees the URL the
     browser will navigate to — not the disguised one a filter saw."""
-    return unicodedata.normalize("NFKC", text.translate(_INVISIBLE))
+    return unicodedata.normalize("NFKC", text.translate(_INVISIBLE).translate(_BROWSER_STRIPPED))
+
+
+# Latin look-alikes from other scripts (Cyrillic / Greek / Armenian /
+# Cherokee). A label built from these can *render* exactly like a brand
+# name while being a different, attacker-owned domain. The skeleton of
+# a label is what it looks like; comparing skeletons to brand names
+# catches the pure-foreign-script homographs that a mixed-script check
+# alone misses.
+_CONFUSABLES = str.maketrans({
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y",
+    "к": "k", "м": "m", "н": "h", "т": "t", "в": "b", "ѕ": "s", "і": "i",
+    "ј": "j", "ԁ": "d", "г": "r", "п": "n", "α": "a", "β": "b", "ε": "e",
+    "η": "n", "ι": "i", "κ": "k", "μ": "u", "ν": "v", "ο": "o", "ρ": "p",
+    "τ": "t", "χ": "x", "ω": "w", "ᴀ": "a", "ƅ": "b",
+    "ƈ": "c", "ƌ": "d", "ɛ": "e", "ɡ": "g", "ɦ": "h", "ɩ": "i", "Ɩ": "i",
+    "ʅ": "l", "ɱ": "m", "ɳ": "n", "ʘ": "o", "ʈ": "t", "ʊ": "u", "ʋ": "v",
+    "ʏ": "y", "ᴢ": "z",
+})
+
+
+def _skeleton(text: str) -> str:
+    """The Latin skeleton of a label — what it visually impersonates."""
+    return text.translate(_CONFUSABLES)
 
 
 def _scripts(text: str) -> set[str]:
@@ -248,6 +277,17 @@ def _stage_brand(ctx: _UrlContext) -> None:
             ctx.add(35, "brand-in-host", f"Domain imitates '{brand}' but is not the official {official}.")
         elif any(c and c != brand and _levenshtein(c, brand) in (1, 2) for c in candidates) and len(brand) >= 4:
             ctx.add(30, "typosquat", f"Domain '{sld}' is a near-miss spelling of '{brand}' (typosquatting).")
+    # Homograph via confusable skeleton: a label that is not the brand
+    # in codepoints but *renders* as the brand (e.g. Cyrillic р, а, у
+    # spelling "paypal"). The mixed-script check misses labels written
+    # entirely in one foreign script, so compare skeletons explicitly.
+    if registrable and sld:
+        skeleton = _skeleton(sld)
+        if skeleton != sld:
+            for brand, official in BRANDS.items():
+                if skeleton == brand and registrable != official and not host.endswith("." + official):
+                    ctx.add(30, "homograph-host", f"Domain '{sld}' is built from look-alike foreign-script characters that render as '{brand}' — a homograph impersonation of {official}.")
+                    break
 
 
 def _stage_path(ctx: _UrlContext) -> None:

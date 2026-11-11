@@ -71,3 +71,23 @@ def test_every_finding_carries_a_fix_across_engines():
             assert finding.get("fix"), f"finding {finding['code']} has no prevention/fix"
         for signal in result.get("signals", []):
             assert signal["prevention"], f"signal {signal['id']} has no prevention"
+
+
+# ── Phase 2: URL evasion counters (spec §5.1/§8) ────────────────────
+
+def test_url_tab_in_scheme_is_still_dangerous():
+    r = analyze_url("java\tscript:alert(1)")
+    assert "dangerous-scheme" in _codes(r.as_dict())
+
+
+def test_url_pure_foreign_script_homograph_matches_brand_skeleton():
+    # р, а, у are Cyrillic; the label renders as "paypal" but is not.
+    r = analyze_url("http://раураl.com/login")
+    codes = _codes(r.as_dict())
+    assert "homograph-host" in codes
+    assert r.risk_score >= 40
+
+
+def test_url_real_brand_domain_not_flagged_as_homograph():
+    r = analyze_url("https://www.paypal.com/signin")
+    assert "homograph-host" not in _codes(r.as_dict())
