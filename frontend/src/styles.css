@@ -245,13 +245,6 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
   .nav .live-pill { display: none; }
 }
 @media (max-width: 480px) { .nav .btn.primary { display: none; } .seg .seg-label { display: none; } .seg button { padding: 0 8px; } }
-@media (max-width: 640px) {
-  .command-bar { flex-wrap: wrap; }
-  .command-bar textarea { flex: 1; min-height: 54px; }
-  .command-bar .kbd { display: none; }
-  .command-bar button[type="submit"] { margin-left: auto; }
-  .panel-title { flex-basis: 100%; }
-}
 @media (max-width: 400px) { .nav .btn.ghost { display: none; } }
 
 /* ---------- Hero ---------- */
@@ -318,6 +311,17 @@ button.linklike:not(:disabled):hover { background: none; color: var(--accent-hov
 .panel-url { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--text-2); overflow-wrap: anywhere; margin: 0 0 4px; }
 .panel-note { margin: 16px 0 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--text-3); font-size: 0.8125rem; display: flex; gap: 8px; align-items: flex-start; }
 .panel-note svg { flex: none; margin-top: 2px; color: var(--accent); }
+
+/* Mobile command bar — placed after the hero/panel base rules so
+   the cascade actually applies (it previously sat in the nav section,
+   before the base rules it was meant to override). */
+@media (max-width: 640px) {
+  .command-bar { flex-wrap: wrap; }
+  .command-bar textarea { flex: 1; min-height: 78px; padding: 12px 4px; }
+  .command-bar .kbd { display: none; }
+  .command-bar button[type="submit"] { margin-left: auto; }
+  .panel-title { flex-basis: 100%; }
+}
 
 /* ---------- Coverage cards ---------- */
 .cover-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
