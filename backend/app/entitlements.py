@@ -30,3 +30,11 @@ def effective_plan(user: User | None, now: datetime | None = None) -> str:
 
 def is_pro(user: User | None) -> bool:
     return effective_plan(user) == "pro"
+
+
+# Spec §2 tier table: monitored-domain allowance per effective plan.
+MONITOR_LIMITS = {"free": 1, "pro": 10}
+
+
+def monitor_limit(user: User | None) -> int:
+    return MONITOR_LIMITS.get(effective_plan(user), 0)

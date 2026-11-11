@@ -101,6 +101,24 @@ class ApiKey(Base):
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
+class MonitoredDomain(Base):
+    """A domain the owner of an account watches (spec §2). Stores the
+    last graded result of the public domain checker so a re-check can
+    flag change; no credentials, no private data."""
+
+    __tablename__ = "monitored_domains"
+    __table_args__ = (UniqueConstraint("user_id", "domain", name="uq_monitor_user_domain"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    domain: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_grade: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    last_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    change_detected: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class BillingEvent(Base):
     """One row per accepted webhook delivery — the idempotency ledger.
 
