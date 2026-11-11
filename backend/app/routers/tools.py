@@ -457,6 +457,17 @@ def _as_utc(ts: datetime | None) -> datetime | None:
 _trending_cache: tuple[float, dict] | None = None
 
 
+@public_router.get("/api/public/config")
+async def public_config():
+    """Non-sensitive runtime flags the SPA needs before first paint:
+    whether the external ad-network slot is live (spec §3). The slot
+    URL is public by nature (it is what the iframe loads); no keys or
+    account internals are exposed here."""
+    enabled = bool(settings.ads_network_enabled and settings.ads_network_slot_url)
+    return {"ads": {"network_enabled": enabled,
+                    "slot_url": settings.ads_network_slot_url if enabled else None}}
+
+
 @public_router.get("/api/public/trending")
 async def trending(db: Session = Depends(get_db)):
     global _trending_cache

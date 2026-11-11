@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sponsored — network slot (reserved)</title>
+<link rel="stylesheet" href="/assets/ads.css" />
+</head>
+<body>
+<!--
+  RESERVED NETWORK SLOT (spec §3). This page is the wrapper template the
+  owner deploys to the dedicated ads subdomain when an ad-network
+  account exists. Until then it renders a neutral placeholder and loads
+  NOTHING external: no network tag, no tracker, no third-party request.
+
+  Activation (owner only):
+  1. Create the network account (EthicalAds/Carbon first, per spec).
+  2. Host this wrapper on the ads subdomain with the network's tag
+     inside it, under that host's own restrictive CSP.
+  3. Set AEGIS_ADS_NETWORK_ENABLED=true, AEGIS_ADS_NETWORK_FRAME_SRC to
+     the subdomain origin and AEGIS_ADS_NETWORK_SLOT_URL to this page.
+  The SPA then frames it — sandboxed, labelled, and only for visitors
+  who chose "Allow if added later" in Privacy choices.
+-->
+<div class="creative">
+  <div>
+    <p class="brand">Sponsored</p>
+    <p class="line">This reserved slot carries clearly labelled sponsor messages. No tracking is loaded in this space.</p>
+  </div>
+</div>
+</body>
+</html>

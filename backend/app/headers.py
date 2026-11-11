@@ -26,6 +26,24 @@ SPA_CSP = (
 )
 
 
+def spa_csp() -> str:
+    """The SPA CSP for this request, honouring the ad-network flag.
+
+    Default output is byte-identical to ``SPA_CSP`` — same-origin
+    frames only (house ads). Only when the owner has enabled an
+    external ad network AND configured its https origin does a
+    ``frame-src`` appear, allowlisting exactly that one origin for
+    the sandboxed ad iframe (spec §3). ``'unsafe-inline'`` is never
+    added for ads; a network that cannot run inside this shape is
+    not integrated.
+    """
+    from app.config import settings
+
+    if settings.ads_network_enabled and settings.ads_network_frame_src.startswith("https://"):
+        return SPA_CSP + f"; frame-src 'self' {settings.ads_network_frame_src}"
+    return SPA_CSP
+
+
 def cache_control_for(path: str) -> str:
     """Cache policy split by surface — this is what lets the single
     service absorb traffic spikes instead of re-serving everything:
@@ -74,7 +92,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 continue  # set per-surface by cache_control_for below
             response.headers.setdefault(name, value)
         is_api = request.url.path.startswith(("/api", "/health", "/docs", "/openapi"))
-        response.headers["Content-Security-Policy"] = API_CSP if is_api else SPA_CSP
+        response.headers["Content-Security-Policy"] = API_CSP if is_api else spa_csp()
         response.headers["Cache-Control"] = cache_control_for(request.url.path)
         if "server" in response.headers:
             del response.headers["server"]

@@ -200,19 +200,36 @@ function TrendingSection() {
   );
 }
 
-/* First-party sponsored slot: a reserved, labelled frame so layout
- * never shifts. Creatives are same-origin static pages in a sandboxed
- * iframe — no third-party scripts, no trackers (see /ad-policy). */
+/* Sponsored slot: a reserved, labelled frame so layout never shifts.
+ * Default creative is the first-party house page — no third-party
+ * scripts, no trackers (see /ad-policy). The external network slot
+ * (spec §3) replaces it ONLY when the owner has enabled it server-side
+ * AND this visitor consented to third-party content; it stays in a
+ * sandboxed cross-origin iframe, never with allow-same-origin. */
 function HouseAd({ variant }: { variant?: "sponsor" }) {
+  const [networkUrl, setNetworkUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let consent = "";
+    try { consent = window.localStorage.getItem("aegis-consent") || ""; } catch { /* private mode */ }
+    if (consent !== "third-party-allowed") return;
+    let live = true;
+    fetch("/api/public/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (live && cfg?.ads?.network_enabled && cfg.ads.slot_url) setNetworkUrl(cfg.ads.slot_url);
+      })
+      .catch(() => { /* house creative remains — fail closed */ });
+    return () => { live = false; };
+  }, []);
   return (
     <aside className="ad-slot" aria-label="Sponsored">
       <p className="ad-label">Sponsored</p>
       <iframe
         className="ad-frame"
-        src={variant === "sponsor" ? "/ads/house.html#sponsor" : "/ads/house.html"}
+        src={networkUrl ?? (variant === "sponsor" ? "/ads/house.html#sponsor" : "/ads/house.html")}
         title="Sponsored message"
         loading="lazy"
-        sandbox="allow-popups"
+        sandbox={networkUrl ? "allow-scripts allow-popups" : "allow-popups"}
       />
     </aside>
   );
