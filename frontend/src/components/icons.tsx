@@ -171,6 +171,18 @@ export function CopyIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function ShareIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size, className)}>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m8.59 13.51 6.83 3.98" />
+      <path d="m15.41 6.51-6.82 3.98" />
+    </svg>
+  );
+}
+
 export function RefreshIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size, className)}>

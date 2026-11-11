@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Finding, LiveStepEvent, StreamHandlers } from "../api";
-import { AlertIcon, CheckCircleIcon, CheckIcon, CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon, InfoIcon } from "./icons";
+import { AlertIcon, CheckCircleIcon, CheckIcon, CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon, InfoIcon, ShareIcon } from "./icons";
 
 /** The hero scan box dispatches this event; the URL checker listens
  * for it, adopts the value and runs — one search surface, like the
@@ -85,19 +85,44 @@ export function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
 }
 
-/** Copy-summary / copy-JSON actions offered under every result. */
+/** Copy-summary / share / copy-JSON actions offered under every
+ * result, with a checked-at line (client clock, set when the result
+ * renders). Share uses the Web Share API where available and falls
+ * back to copying the summary. */
 export function ResultActions({ title, summary, data }: { title: string; summary: string; data: unknown }) {
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [checkedAt] = useState(() => new Date());
+  async function share() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Aegis check result", text: summary });
+        return;
+      }
+      throw new Error("no native share");
+    } catch {
+      void copyText(summary, setShared);
+    }
+  }
   return (
-    <div className="actions-row">
-      <button type="button" className="copy" onClick={() => void copyText(summary, setCopiedSummary)}>
-        <CopyIcon size={14} /> {copiedSummary ? "Copied" : `Copy ${title}`}
-      </button>
-      <button type="button" className="copy" onClick={() => void copyText(JSON.stringify(data, null, 2), setCopiedJson)}>
-        <DownloadIcon size={14} /> {copiedJson ? "Copied" : "Copy as JSON"}
-      </button>
-    </div>
+    <>
+      <p className="meta result-meta">
+        <span>Checked at {checkedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+        <span>Source: this device · Aegis live check</span>
+      </p>
+      <div className="actions-row">
+        <button type="button" className="copy" onClick={() => void copyText(summary, setCopiedSummary)}>
+          <CopyIcon size={14} /> {copiedSummary ? "Copied" : `Copy ${title}`}
+        </button>
+        <button type="button" className="copy" onClick={() => void share()}>
+          <ShareIcon size={14} /> {shared ? "Copied to share" : "Share"}
+        </button>
+        <button type="button" className="copy" onClick={() => void copyText(JSON.stringify(data, null, 2), setCopiedJson)}>
+          <DownloadIcon size={14} /> {copiedJson ? "Copied" : "Copy as JSON"}
+        </button>
+      </div>
+    </>
   );
 }
 
