@@ -67,6 +67,8 @@ _CATEGORY_BY_CODE = {
     "kyc-threat": "social_engineering", "digital-arrest": "social_engineering",
     "prize-scam": "social_engineering", "task-scam": "social_engineering",
     "crypto-doubling": "social_engineering", "investment-scam": "social_engineering",
+    "sextortion": "social_engineering", "tax-refund-scam": "social_engineering",
+    "forwarded-chain": "social_engineering",
     "parcel-scam": "social_engineering", "family-emergency": "social_engineering",
     "tech-support-scam": "social_engineering", "loan-scam": "social_engineering",
     "callback-number": "social_engineering",

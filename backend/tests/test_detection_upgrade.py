@@ -158,3 +158,11 @@ def test_email_public_origin_not_flagged():
     )
     r = analyze_email(headers, "Your statement is ready.")
     assert "received-private-hop" not in _codes(r)
+
+
+# ── Phase 5: message playbooks (spec §5.5) ──────────────────────────
+
+def test_message_sextortion_and_tax_and_forwarded_playbooks():
+    assert "sextortion" in _codes(analyze_message("I have recorded your webcam. Pay or I will share the video with your contacts."))
+    assert "tax-refund-scam" in _codes(analyze_message("Your income tax refund is pending. Claim your refund here to receive it."))
+    assert "forwarded-chain" in _codes(analyze_message("Forwarded many times: Good morning, share this with 10 friends"))

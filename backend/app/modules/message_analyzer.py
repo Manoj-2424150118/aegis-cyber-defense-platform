@@ -139,6 +139,12 @@ def _stage_playbooks(ctx: _MsgContext) -> None:
         ctx.add(18, "loan-scam", "Loan-scam pattern: 'instant/pre-approved' loans that demand a processing or disbursement fee up front. Licensed lenders deduct fees from the disbursement — they never collect them by UPI first.")
     if ctx.hits(INVESTMENT_SCAM):
         ctx.add(18, "investment-scam", "Unsolicited investment-group/tips pitch: SEBI-registered advisors do not recruit through random WhatsApp/Telegram groups promising assured returns — the 'profits' shown are staged to make you deposit more.")
+    if ctx.hits(SEXTORTION):
+        ctx.add(22, "sextortion", "Sextortion pattern: threats to leak private images/video unless paid are almost always bluff — the scammer rarely has anything. Do NOT pay (payment marks you as a payer and the demands grow); save the messages, block, and report to cybercrime.gov.in / your platform.")
+    if ctx.hits(TAX_BENEFIT_SCAM):
+        ctx.add(18, "tax-refund-scam", "Tax-refund / benefit lure: tax refunds and government benefits are credited only to the bank account registered with the department — never through a link in a message asking you to 'claim' or 'verify' to receive them.")
+    if "forwarded many times" in ctx.lower:
+        ctx.add(8, "forwarded-chain", "This is a mass-forwarded chain message ('forwarded many times') — chain forwards are the distribution channel for scam campaigns; treat every claim and link in it as unverified.")
 
 
 def _stage_pressure(ctx: _MsgContext) -> None:
@@ -153,6 +159,8 @@ FAMILY_ASK = ["send money", "need money", "in trouble", "in hospital", "urgent m
 TECH_SUPPORT = ["microsoft support", "your computer has a virus", "computer is infected", "device is hacked", "tech support", "refund department", "install anydesk", "install teamviewer", "download anydesk", "call our support team"]
 LOAN_SCAM = ["instant loan", "loan approved", "pre-approved loan", "no cibil", "loan without documents", "processing fee for your loan", "loan disbursement fee"]
 INVESTMENT_SCAM = ["stock tips", "share market tips", "trading group", "investment group", "ipo allotment", "guaranteed income", "monthly returns assured", "risk free profit", "risk-free returns", "double your investment"]
+SEXTORTION = ["i have recorded you", "recorded your webcam", "your private video", "i have your video", "send bitcoin or i will", "pay or i will share", "will leak your", "your contacts will receive", "webcam footage", "pay btc or"]
+TAX_BENEFIT_SCAM = ["income tax refund", "tax refund is pending", "refund of rs", "pm kisan", "benefit amount will be credited", "government benefit", " subsidy claim", "claim your refund", "it department refund"]
 _PHONE_RE = re.compile(r"(?:\+\d{1,3}[\s\-]?)?(?:\d[\s\-]?){9,12}\d")
 
 
