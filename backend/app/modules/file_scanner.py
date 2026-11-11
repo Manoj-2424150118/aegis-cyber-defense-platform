@@ -51,6 +51,12 @@ IOC_PATTERNS = {
 }
 MAX_ZIP_RATIO = 100
 MAX_ZIP_TOTAL = 500 * 1024 * 1024
+# F-05: hard cap on bytes read from any single archive member during
+# inspection. The zip-bomb checks above reason about DECLARED sizes;
+# member content is only ever consumed through a bounded stream read,
+# so a member claiming (or smuggling) hundreds of MB cannot be
+# decompressed into RAM. Real .rels parts are a few KB.
+MAX_MEMBER_READ = 256 * 1024
 
 
 def _entropy(data: bytes) -> float:
@@ -159,8 +165,11 @@ def _stage_archive(ctx: _FileContext) -> None:
             # (and macros' staging page) from a remote template at open.
             for info in zf.infolist():
                 if info.filename.endswith(".rels"):
+                    if info.file_size > MAX_MEMBER_READ:
+                        continue  # oversized member: never read into memory (F-05)
                     try:
-                        rels = zf.read(info.filename).decode("utf-8", "ignore")
+                        with zf.open(info) as member:
+                            rels = member.read(MAX_MEMBER_READ + 1)[:MAX_MEMBER_READ].decode("utf-8", "ignore")
                     except Exception:
                         continue
                     if 'TargetMode="External"' in rels and ("attachedTemplate" in rels or "template" in rels.lower()):
