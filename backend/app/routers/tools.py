@@ -10,9 +10,9 @@ import time as _time
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app import streaming
@@ -514,3 +514,36 @@ async def history(user: User = Depends(get_current_user), db: Session = Depends(
         }
         for r in rows
     ]
+
+
+@router.get("/history/export")
+async def history_export(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Full-history JSON export — a Pro entitlement (spec §2). Unlike
+    the dashboard view there is no retention window and no 50-row cap:
+    export is the data-portability path (DPDP/GDPR export right)."""
+    if not is_pro(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN,
+                            "History export is a Pro feature. Free accounts keep 30 days of history in the dashboard.")
+    rows = (
+        db.query(ScanHistory)
+        .filter(ScanHistory.user_id == user.id)
+        .order_by(ScanHistory.created_at.asc())
+        .all()
+    )
+    payload = {
+        "exported_at": datetime.now(UTC).isoformat(),
+        "account": user.email,
+        "count": len(rows),
+        "history": [
+            {
+                "id": r.id, "scan_type": r.scan_type, "target": r.target,
+                "risk_score": r.risk_score, "verdict": r.verdict,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": 'attachment; filename="aegis-history-export.json"'},
+    )

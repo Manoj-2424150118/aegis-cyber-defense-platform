@@ -37,6 +37,11 @@ def _key(request: Request, user: User | None) -> str:
 
 
 def _optional_user(request: Request, db: Session) -> User | None:
+    api_key = request.headers.get("x-api-key")
+    if api_key:
+        from app.apikeys import user_from_api_key
+
+        return user_from_api_key(db, api_key)
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer "):
         return None
