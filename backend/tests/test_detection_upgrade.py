@@ -182,3 +182,28 @@ def test_password_strength_score_and_crack_times_present():
     assert set(strong["crack_times"]) == {"online_throttled", "offline_fast_hash"}
     # Legacy contract untouched.
     assert strong["label"] in ("strong", "excellent") and "score" in strong
+
+
+# ── Phase 7: file IOC values, LNK, HTML smuggling (spec §5.3) ──────
+
+def test_file_ioc_values_extracted():
+    payload = b"contact admin@evil.example.com or http://198.51.100.9:8080/drop and pay 0x" + b"a" * 40
+    # use a genuinely public-looking IP for realism in the fixture
+    payload = payload.replace(b"198.51.100.9", b"45.155.204.9")
+    r = scan_file("notes.txt", payload)
+    assert "45.155.204.9:8080" in r["iocs"]["ips"] or any("45.155.204.9" in v for v in r["iocs"]["ips"])
+    assert any("evil.example.com" in e for e in r["iocs"]["emails"])
+    assert r["external_engines"] == {"yara": "not-configured", "clamav": "not-configured"}
+
+
+def test_file_lnk_with_shell_target_flagged():
+    lnk = b"\x4c\x00\x00\x00\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46" + \
+          "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -enc aGVsbG8=".encode("utf-16-le")
+    r = scan_file("invoice.lnk", lnk)
+    assert "lnk-suspicious-target" in _codes(r)
+
+
+def test_file_html_smuggling_flagged():
+    html = b"<html><script>var b=atob('TVqQ...');var u=URL.createObjectURL(new Blob([b]));</script></html>"
+    r = scan_file("report.html", html)
+    assert "html-smuggling" in _codes(r)

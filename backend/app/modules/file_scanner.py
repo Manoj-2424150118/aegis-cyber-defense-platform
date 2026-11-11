@@ -80,6 +80,7 @@ class _FileContext:
         # misleading noise on top of the definitive identification.
         self.is_eicar = EICAR_SIGNATURE in data
         self.hits: dict[str, int] = {}
+        self.iocs: dict[str, list[str]] = {}
         self.findings: list[dict] = []
         self.score = 0
 
@@ -126,9 +127,59 @@ def _stage_ioc(ctx: _FileContext) -> None:
         count = len(pattern.findall(ctx.data))
         if count:
             ctx.hits[code] = count
+    _extract_ioc_values(ctx)
     weights = {"powershell-dropper": 40, "certutil-dropper": 40, "shell-dropper": 40, "macro-autoexec": 25, "base64-pe": 30, "embedded-url": 5, "embedded-ip": 5, "crypto-wallet-address": 10, "mshta-dropper": 40, "crypto-wallet-eth": 10, "rundll32-dropper": 35, "amsi-bypass": 40, "credential-theft": 45, "exec-policy-bypass": 20, "hidden-window": 15}
     for code, count in ctx.hits.items():
         ctx.add(weights.get(code, 5), code, f"Found {count} indicator(s) of type '{code}' embedded in the file.")
+
+
+_LNK_MAGIC = b"\x4c\x00\x00\x00\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46"
+_IOC_VALUE_PATTERNS = {
+    "urls": re.compile(r"https?://[^\s\"'<>]{4,120}"),
+    "ips": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}(?::\d{1,5})?\b"),
+    "emails": re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"),
+    "wallets": re.compile(r"\b(?:bc1|[13])[a-zA-HJ-NP-Za-km-z]{25,39}\b|\b0x[a-fA-F0-9]{40}\b"),
+}
+
+
+def _extract_ioc_values(ctx: _FileContext) -> None:
+    """IOC *values* (spec §5.3): the actual URLs / IPs / emails /
+    wallets embedded in the file, so a triage analyst can block them
+    without re-opening the sample. Bounded and de-duplicated; values
+    come from the file only, nothing is fetched."""
+    text = ctx.data.decode("latin-1", "ignore")
+    for kind, pattern in _IOC_VALUE_PATTERNS.items():
+        values: list[str] = []
+        for match in pattern.findall(text):
+            value = match.rstrip(".,;:!?)\"'").strip()
+            if value and value not in values:
+                values.append(value)
+            if len(values) >= 10:
+                break
+        if values:
+            ctx.iocs[kind] = values
+
+
+def _stage_lnk_and_smuggling(ctx: _FileContext) -> None:
+    if ctx.is_eicar:
+        return
+    if ctx.data.startswith(_LNK_MAGIC) or ctx.ext == ".lnk":
+        # LNK files carry their real behaviour as UTF-16 strings: the
+        # target program and its arguments. A shortcut whose target is
+        # a shell / LOLBin / remote payload is a delivery mechanism,
+        # not a shortcut.
+        decoded = ctx.data.decode("utf-16-le", "ignore")
+        lowered = decoded.lower()
+        suspicious = [t for t in ("powershell", "cmd.exe", "mshta", "wscript", "cscript",
+                                  "rundll32", "http://", "https://", "-enc", "bypass") if t in lowered]
+        if suspicious:
+            strings = [s for s in re.findall(r"[\x20-\x7e]{6,}", decoded) if any(t in s.lower() for t in suspicious)]
+            target = (strings[0][:80] if strings else "shell/LOLBin target")
+            ctx.add(35, "lnk-suspicious-target", f"Shortcut (.lnk) points at a suspicious target ({target}) — weaponised shortcuts launch their target the moment they are double-clicked, and are a top phishing attachment.")
+    if ctx.ext in (".html", ".htm") or ctx.detected_type == "HTML document":
+        lowered = ctx.data.lower()
+        if b"createobjecturl" in lowered and (b"atob(" in lowered or b"base64" in lowered):
+            ctx.add(30, "html-smuggling", "HTML file assembles a download in the browser from an embedded base64 blob (HTML smuggling) — the payload never crosses the network as a file, so gateway scanners never see it.")
 
 
 def _stage_archive(ctx: _FileContext) -> None:
@@ -175,6 +226,7 @@ FILE_STAGES = [
     ("Type verification — magic bytes vs declared extension", _stage_type),
     ("Entropy & macro analysis", _stage_entropy),
     ("Indicator scan — droppers · downloaders · suspicious strings", _stage_ioc),
+    ("Shortcuts & HTML smuggling — LNK targets, in-browser payload assembly", _stage_lnk_and_smuggling),
     ("Archive inspection — nested payloads & zip bombs", _stage_archive),
 ]
 
@@ -213,5 +265,9 @@ def scan_file(filename: str, data: bytes) -> dict:
         "md5": hashlib.md5(ctx.data, usedforsecurity=False).hexdigest(),
         "entropy": round(ctx.entropy, 2),
         "risk_score": score, "verdict": verdict, "findings": findings, "ioc_hits": ctx.hits,
+        "iocs": ctx.iocs,
+        # Signature engines are deployment-optional (spec §6 fallbacks):
+        # named honestly instead of being silently absent.
+        "external_engines": {"yara": "not-configured", "clamav": "not-configured"},
     }
     return enrich(result, "file", duration_ms=int((time.perf_counter() - started) * 1000))

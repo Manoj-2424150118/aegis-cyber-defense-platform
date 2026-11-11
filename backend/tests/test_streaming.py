@@ -57,7 +57,7 @@ def test_file_stream_parity(client):
     classic = client.post("/api/tools/file", files={"file": ("invoice.pdf", data)}).json()
     events = _events(client.post("/api/tools/file/stream", files={"file": ("invoice.pdf", data)}))
     steps = [e for e in events if e["type"] == "step"]
-    assert len(steps) == 5
+    assert len(steps) == 6
     result = events[-1]["result"]
     assert result["risk_score"] == classic["risk_score"]
     assert result["sha256"] == classic["sha256"]

@@ -98,6 +98,8 @@ FIXES: dict[str, str] = {
     "excessive-entries": "Do not extract blindly. If the archive is expected, extract in a sandbox/VM and scan the contents with this scanner first.",
     "archive-hides-executable": "Do not run anything inside this archive. Delete it, or extract in a sandbox and scan each file before use.",
     "corrupt-archive": "Delete the file — malformed archives are used to evade scanners. Re-request the document from the sender via a separate channel if it was expected.",
+    "lnk-suspicious-target": "Delete the shortcut and the message that carried it. Legitimate shortcuts point at documents and apps — never at shells, script hosts or web addresses. Report the message as phishing.",
+    "html-smuggling": "Do not open this HTML file — it builds a hidden download inside your browser. Delete it and tell your IT/security contact; if it was already opened, treat whatever it downloaded as hostile and scan the device.",
     "eicar-test": "This is the EICAR standard anti-malware test file — a harmless industry test string, not real malware. No action needed; its detection confirms the scanner works.",
     # ── Website audit (for site owners) ─────────────────────────────
     "https": "Keep it: renew certificates before expiry (automate with Let's Encrypt) and redirect all HTTP traffic to HTTPS.",
