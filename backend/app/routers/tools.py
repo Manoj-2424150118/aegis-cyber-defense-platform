@@ -77,17 +77,34 @@ _EVENT_BURST_WINDOW = 60
 _EVENT_BURST_MAX = 3
 _recent_events: dict[tuple, tuple[float, int]] = {}
 
+# F-04: a GLOBAL per-signature ceiling, independent of source. The
+# per-source cap above stops one IP flooding; it does nothing against
+# many IPs (or one patient IP) jointly inflating a single domain/brand
+# into the public "top flagged" lists. 20/hour/signature is far above
+# any organic rate for one phish domain and far below poisoning scale.
+_SIGNATURE_WINDOW = 3600
+_SIGNATURE_MAX = 20
+_signature_events: dict[tuple, tuple[float, int]] = {}
 
-def _over_burst_cap(key: tuple) -> bool:
+
+def _over_cap(store: dict, key: tuple, window: float, maximum: int) -> bool:
     now = _time.monotonic()
-    if len(_recent_events) > 4096:  # bound memory; stale entries are useless anyway
-        _recent_events.clear()
-    start, count = _recent_events.get(key, (now, 0))
-    if now - start >= _EVENT_BURST_WINDOW:
+    if len(store) > 4096:  # bound memory; stale entries are useless anyway
+        store.clear()
+    start, count = store.get(key, (now, 0))
+    if now - start >= window:
         start, count = now, 0
     count += 1
-    _recent_events[key] = (start, count)
-    return count > _EVENT_BURST_MAX
+    store[key] = (start, count)
+    return count > maximum
+
+
+def _over_burst_cap(key: tuple) -> bool:
+    return _over_cap(_recent_events, key, _EVENT_BURST_WINDOW, _EVENT_BURST_MAX)
+
+
+def _over_signature_ceiling(key: tuple) -> bool:
+    return _over_cap(_signature_events, key, _SIGNATURE_WINDOW, _SIGNATURE_MAX)
 
 
 def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | None = None,
@@ -103,9 +120,11 @@ def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | N
     if verdict not in _FLAGGED:
         domain, brand = None, None
     codes_key = ",".join(codes)[:500]
-    # The burst cap guards only the poisonable surface (flagged
-    # domains/brands); plain scan counts always record.
+    # The caps guard only the poisonable surface (flagged domains/brands);
+    # plain scan counts always record.
     if (domain or brand) and _over_burst_cap((source or "anon", scan_type, domain, brand, codes_key)):
+        return
+    if (domain or brand) and _over_signature_ceiling((scan_type, domain, brand, codes_key)):
         return
     try:
         db = SessionLocal()
@@ -116,10 +135,35 @@ def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | N
                 brand=brand, finding_codes=",".join(codes)[:500],
             ))
             db.commit()
+            _prune_old_events(db)
         finally:
             db.close()
     except Exception:
         logger.debug("scan-event recording failed", exc_info=True)
+
+
+# Retention (F-04): the public aggregate is a 30-day window; rows older
+# than the window must not accumulate forever (unbounded growth also
+# makes the headline count a standing invitation to slow inflation).
+# Pruned opportunistically on the write path, at most once an hour.
+_RETENTION_DAYS = 30
+_last_prune = 0.0
+
+
+def _prune_old_events(db: Session) -> None:
+    global _last_prune
+    now_mono = _time.monotonic()
+    if now_mono - _last_prune < 3600:
+        return
+    _last_prune = now_mono
+    cutoff = datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)
+    stale = [
+        row_id for row_id, created in db.query(ScanEvent.id, ScanEvent.created_at).all()
+        if (_as_utc(created) or cutoff) < cutoff
+    ]
+    if stale:
+        db.query(ScanEvent).filter(ScanEvent.id.in_(stale)).delete(synchronize_session=False)
+        db.commit()
 
 
 def _record_url_event(raw_url: str, report, source: str | None = None) -> None:
