@@ -160,7 +160,6 @@ export function PasswordInput({
         onClick={() => setShown((s) => !s)}
         aria-label={shown ? "Hide password" : "Show password"}
         aria-pressed={shown}
-        tabIndex={-1}
       >
         {shown ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
       </button>
