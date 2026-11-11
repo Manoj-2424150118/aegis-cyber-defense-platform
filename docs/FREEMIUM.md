@@ -54,19 +54,60 @@ explicit go-ahead.
   (`default-src 'none'; style-src 'self'; frame-ancestors 'self';
   sandbox`) and no X-Frame-Options denial.
 - Consent: the banner stores a first-party-only / future-third-party
-  choice; nothing third-party exists to load today. Footer "Privacy
-  choices" reopens it. Ads never appear on vault/authenticated pages.
+  choice; Footer "Privacy choices" reopens it. Ads never appear on
+  vault/authenticated pages.
+- External network (built, inert): `GET /api/public/config` reports
+  whether the network slot is live. The SPA swaps the house creative
+  for the network page only when the owner has set
+  `AEGIS_ADS_NETWORK_ENABLED=true` + the slot URL **and** the visitor
+  consented to third-party content; the frame stays sandboxed
+  (never `allow-same-origin`) and the SPA CSP gains exactly one
+  `frame-src` origin — no `'unsafe-inline'`, ever. The wrapper
+  template is `frontend/public/ads/network.html`; it loads nothing
+  external until the owner hosts it on the ads subdomain with a real
+  network account (EthicalAds/Carbon first, per spec §3).
 
-## Billing (staged — needs the owner's provider account)
-Not activated: no checkout exists and the pricing page says so.
-Activation checklist when the owner creates the account:
-1. Razorpay (India) or Stripe account + KYC; create Pro monthly/annual
-   products; put keys in Render env (never in git).
-2. Hosted checkout links/buttons on /pricing; webhook endpoint with
-   signature verification + idempotency mapping to `users.plan`.
-3. GST invoices via the provider; refund policy already published.
-4. Entitlement is already server-side (`users.plan`), so activation is
-   wiring, not redesign.
+## Billing (built, inert — needs the owner's provider account)
+The code is complete and tested; it does nothing until enabled.
+- `POST /api/billing/checkout` returns the provider-hosted checkout
+  URL from env (Stripe Payment Links / Razorpay Payment Pages), so
+  card data never touches this service. Unconfigured cycle → 503.
+- `POST /api/billing/webhook/{stripe|razorpay}` verifies the HMAC
+  signature (stdlib, timestamp tolerance for Stripe), de-duplicates
+  on (provider, event id) in `billing_events` (payload digest only —
+  raw bodies are never stored), and maps subscription state onto
+  `users.plan` + `plan_period_end`.
+- `app/entitlements.py` is the single gate: effective Pro honours the
+  paid period end (grace), then falls back to free. Quota, vault cap,
+  history window, export, API keys and monitoring all consult it.
+Activation checklist (owner only):
+1. Choose Stripe (global) or Razorpay (India); complete KYC; create
+   the Pro monthly/annual products and hosted checkout pages there.
+2. In Render env set `AEGIS_BILLING_ENABLED=true`,
+   `AEGIS_BILLING_PROVIDER`, `AEGIS_BILLING_WEBHOOK_SECRET`, the two
+   `AEGIS_BILLING_CHECKOUT_URL_*` values and the display prices
+   `AEGIS_PRO_PRICE_*_DISPLAY` (never in git).
+3. Point the provider's webhook at
+   `https://<host>/api/billing/webhook/<provider>`; for Stripe, put
+   the Aegis user id in the checkout's `client_reference_id` (or rely
+   on customer-id linkage after the first event).
+4. GST invoices/refunds run through the provider; refund policy is
+   already published.
+
+## Pro entitlements (built)
+- **API keys** (`/api/keys`): Pro-only creation, shown once, stored
+  as an HMAC under the server secret, revocable, accepted via
+  `X-API-Key` anywhere a bearer token is. Listing shows prefixes only.
+- **History export** (`GET /api/tools/history/export`): full history
+  JSON download for Pro — no 30-day window, no 50-row cap (the DPDP/
+  GDPR portability path). Free gets a 403 with the value prop.
+- **Domain monitoring** (`/api/monitoring`): free watches 1 domain,
+  Pro 10. Checks re-run the Domain Security Checker and flag grade
+  changes in-product. Outbound email/push alerts are NOT built — no
+  mail infrastructure exists here; adding one is an owner decision.
+- **Not built**: team seats (needs an org/tenancy model — owner
+  decision), an admin revenue dashboard (needs an admin-role model;
+  billing state is fully visible in the provider dashboard meanwhile).
 
 ## SEO (live)
 Prerendered pages from `frontend/scripts/build_pages.py` (outputs

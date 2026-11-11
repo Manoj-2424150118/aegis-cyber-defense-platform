@@ -7,8 +7,6 @@ import json
 import time
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 from app.config import settings
 
 CREDS = {"email": "buyer@example.com", "password": "StrongPass!2026-secure"}

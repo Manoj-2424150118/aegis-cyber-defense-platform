@@ -1,6 +1,5 @@
 """Domain monitoring (spec §2): plan limits + change detection."""
 
-import pytest
 
 from app.modules import domain_checker
 
