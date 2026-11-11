@@ -113,6 +113,14 @@ def grade_certificate(host: str, cert: dict, protocol: str | None, verified: boo
         add(15, "tls-san-present", f"The certificate lists {len(san)} subject-alt-name(s), the modern way to cover hostnames.")
     else:
         add(0, "tls-no-san", "The certificate has no subject-alt-names — modern browsers require SANs; a CN-only certificate is legacy and may be rejected.")
+    wildcards = [name for name in san if name.startswith("*.")]
+    if wildcards:
+        add(0, "tls-wildcard", f"The certificate is a wildcard ({', '.join(wildcards[:3])}) — one leaked private key compromises every subdomain at once, and any compromised subdomain host can serve the others' traffic.")
+    not_before = _parse_cert_time(cert["notBefore"]) if cert.get("notBefore") else None
+    if not_before is not None:
+        age_days = (now - not_before).days
+        if 0 <= age_days < 7:
+            add(0, "tls-newly-issued", f"The certificate was issued {age_days} day(s) ago. Brand-new certificates on look-alike domains are a phishing staple — on the site's own domain this is normal after a renewal, but it is worth a conscious check that this renewal was yours.")
 
     score = min(score, 100)
     facts = {

@@ -202,6 +202,43 @@ def _stage_dmarc(ctx: _DomainContext) -> None:
         ctx.add(0, "dkim-not-detected", "No DKIM key found under the common selectors probed. DKIM has no public discovery mechanism, so this does NOT prove DKIM is absent — but if the domain truly doesn't sign, forged mail has one less check to fail.")
 
 
+def lookalike_permutations(domain: str, cap: int = 40) -> list[str]:
+    """dnstwist-style lookalike candidates for a domain: deletions,
+    adjacent swaps, character duplications, hyphen insertions and TLD
+    swaps of the registrable label. Pure and bounded — resolution is
+    the caller's job."""
+    labels = domain.rstrip(".").split(".")
+    if len(labels) < 2:
+        return []
+    sld, tld = labels[-2], labels[-1]
+    prefix = ".".join(labels[:-2])
+    out: set[str] = set()
+
+    def build(label: str, new_tld: str | None = None) -> str:
+        host = f"{label}.{new_tld or tld}"
+        return f"{prefix}.{host}" if prefix else host
+
+    for i in range(len(sld)):
+        out.add(build(sld[:i] + sld[i + 1:]))                    # deletion
+        out.add(build(sld[:i] + sld[i] + sld[i:]))               # duplication
+    for i in range(len(sld) - 1):
+        swapped = sld[:i] + sld[i + 1] + sld[i] + sld[i + 2:]
+        out.add(build(swapped))                                  # transposition
+        out.add(build(sld[:i + 1] + "-" + sld[i + 1:]))          # hyphenation
+    for alt_tld in ("co", "net", "org", "xyz", "top", "online"):
+        if alt_tld != tld:
+            out.add(build(sld, alt_tld))                         # TLD swap
+    out.discard(domain.rstrip("."))
+    return sorted(out)[:cap]
+
+
+def _stage_lookalikes(ctx: _DomainContext) -> None:
+    resolving = ctx.records.get("lookalikes_resolving") or []
+    if resolving:
+        shown = ", ".join(resolving[:5])
+        ctx.add(0, "lookalike-resolving", f"{len(resolving)} lookalike domain(s) of {ctx.domain} are registered and resolving ({shown}) — attackers register exactly these to impersonate the brand. Defensive registration and monitoring are the counters.")
+
+
 def _stage_caa(ctx: _DomainContext) -> None:
     if ctx.records["caa"]:
         ctx.add(15, "caa-present", "CAA records restrict which certificate authorities may issue certificates for this domain — a real control against mis-issuance.")
@@ -214,6 +251,7 @@ DOMAIN_STAGES = [
     ("SPF — who may send for this domain", _stage_spf),
     ("DMARC — the anti-spoofing policy", _stage_dmarc),
     ("CAA — certificate issuance control", _stage_caa),
+    ("Lookalike domains — registered impersonators", _stage_lookalikes),
 ]
 
 
@@ -240,4 +278,18 @@ def evaluate_domain(domain: str, records: dict) -> dict:
 
 
 def check_domain(domain: str) -> dict:
-    return evaluate_domain(domain, fetch_records(domain))
+    records = fetch_records(domain)
+    # Lookalike monitoring (spec §5.6): generate permutations locally
+    # and check which of them actually resolve. Bounded (16 lookups)
+    # and best-effort — a resolver failure simply yields no note.
+    try:
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = _TIMEOUT
+        resolving = [
+            candidate for candidate in lookalike_permutations(domain)[:16]
+            if _resolve(resolver, candidate, "A") or _resolve(resolver, candidate, "AAAA")
+        ]
+        records["lookalikes_resolving"] = resolving
+    except Exception:
+        records["lookalikes_resolving"] = []
+    return evaluate_domain(domain, records)

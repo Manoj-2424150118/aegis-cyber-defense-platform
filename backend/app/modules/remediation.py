@@ -145,7 +145,8 @@ FIXES: dict[str, str] = {
     "upi-payment-ask": "Never pay a personal UPI ID for fees, KYC, refunds or 'verification' — refunds and charges never work that way. Pay only inside the official app of the organisation, and verify the payee name shown by your UPI app before any transfer.",
     # ── Domain checker (for domain owners) ──────────────────────────
     "dns-live": "Keep it: monitor DNS uptime and keep at least two nameservers on separate networks.",
-    "dns-dead": "FIX: Point the domain's A/AAAA records at your host (or accept that the domain is parked). If the domain should not exist publicly, keep it registered and monitored — an expired domain can be re-registered by attackers.",
+        "lookalike-resolving": "Register the resolving lookalikes defensively where cheap, publish DMARC p=reject so they cannot send as you, and monitor Certificate Transparency for certs issued to them.",
+"dns-dead": "FIX: Point the domain's A/AAAA records at your host (or accept that the domain is parked). If the domain should not exist publicly, keep it registered and monitored — an expired domain can be re-registered by attackers.",
     "mx-present": "Keep it: ensure every MX host itself passes this platform's Website Audit and has valid TLS.",
     "mx-missing": "FIX: If the domain sends mail, add MX records for your mail provider. If it never sends mail, publish a null MX (RFC 7505: `0 .`) plus deny-all SPF/DMARC below so forged mail is trivially detectable.",
     "spf-strong": "Keep it: re-check this score after every new sending service is added — a stale SPF that omits a real sender will hard-fail legitimate mail.",
@@ -174,6 +175,8 @@ FIXES: dict[str, str] = {
     "tls-unverified": "FIX: Replace the certificate with one from a public CA (Let's Encrypt is free), serve the FULL chain (leaf + intermediates), and remove any expired/self-signed certificate from the TLS endpoint.",
     "tls-hostname-match": "Keep it: when adding subdomains, extend the certificate's SAN list rather than deploying mismatched certificates.",
     "tls-hostname-mismatch": "FIX: Issue a certificate that actually covers this hostname (add it to the SAN list) — a mismatched certificate triggers browser warnings and destroys trust.",
+    "tls-wildcard": "FIX: Prefer per-service certificates over a wildcard; if a wildcard is unavoidable, keep its private key on the fewest possible hosts and rotate it on any subdomain compromise.",
+    "tls-newly-issued": "Verify this issuance was yours (check your ACME accounts / CA dashboard). If it was not, revoke immediately and investigate — an unauthorised certificate enables undetectable impersonation.",
     "tls-expired": "FIX: Renew the certificate TODAY and automate renewal (ACME clients renew 30 days before expiry). An expired certificate shows every visitor a full-page warning.",
     "tls-expiring-soon": "FIX: Renew now and automate it — ACME/Let's Encrypt renewal takes minutes and prevents an expiry outage.",
     "tls-expiry-ok": "Keep it: calendar a renewal check at 30 days remaining, or automate with ACME so it never becomes urgent.",

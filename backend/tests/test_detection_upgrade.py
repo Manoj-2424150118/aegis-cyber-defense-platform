@@ -91,3 +91,47 @@ def test_url_pure_foreign_script_homograph_matches_brand_skeleton():
 def test_url_real_brand_domain_not_flagged_as_homograph():
     r = analyze_url("https://www.paypal.com/signin")
     assert "homograph-host" not in _codes(r.as_dict())
+
+
+# ── Phase 3: domain lookalikes + TLS notes (spec §5.6/§5.7) ────────
+
+from app.modules.domain_checker import lookalike_permutations
+from app.modules.tls_inspector import grade_certificate
+
+_BASE = {
+    "a": ["1.2.3.4"], "aaaa": [], "mx": ["10 mail.example.com"], "ns": ["ns1.example.com"],
+    "spf": ["v=spf1 -all"], "dmarc": ["v=DMARC1; p=reject"], "caa": [],
+    "cname": [], "cname_resolves": True, "dkim": [], "rdap_created": None,
+}
+
+
+def test_lookalike_permutations_are_bounded_and_exclude_original():
+    perms = lookalike_permutations("paypal.com")
+    assert "paypal.com" not in perms
+    assert "paypa.com" in perms          # deletion
+    assert "paypal.co" in perms          # TLD swap
+    assert len(perms) <= 40
+
+
+def test_resolving_lookalike_is_a_zero_point_note():
+    base = evaluate_domain("example.com", dict(_BASE))
+    noted = evaluate_domain("example.com", {**_BASE, "lookalikes_resolving": ["examp1e.com"]})
+    assert noted["score"] == base["score"]
+    assert "lookalike-resolving" in _codes(noted)
+
+
+def test_tls_wildcard_and_newly_issued_are_zero_point_notes():
+    cert = {
+        "subject": ((("commonName", "example.com"),),),
+        "issuer": ((("organizationName", "Test CA"),),),
+        "subjectAltName": (("DNS", "example.com"), ("DNS", "*.example.com")),
+        "notAfter": "Dec 31 23:59:59 2099 GMT",
+        "notBefore": "Jan 1 00:00:00 2099 GMT",
+    }
+    from datetime import datetime, timezone
+    plain = grade_certificate("example.com", {**cert, "subjectAltName": (("DNS", "example.com"),)}, "TLSv1.3", True, now=datetime(2099, 6, 1, tzinfo=timezone.utc))
+    noted = grade_certificate("example.com", cert, "TLSv1.3", True, now=datetime(2099, 6, 1, tzinfo=timezone.utc))
+    assert noted["score"] == plain["score"]
+    assert "tls-wildcard" in _codes(noted)
+    fresh = grade_certificate("example.com", cert, "TLSv1.3", True, now=datetime(2099, 1, 3, tzinfo=timezone.utc))
+    assert "tls-newly-issued" in _codes(fresh)
