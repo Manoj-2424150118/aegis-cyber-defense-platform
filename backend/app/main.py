@@ -71,6 +71,12 @@ THREAT_MODEL = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    logger.info(
+        "rate-limit client IP source: %s",
+        f"proxy-chain (trusted hops={settings.trusted_proxy_hops})"
+        if settings.trust_proxy
+        else "socket-peer",
+    )
     yield
 
 

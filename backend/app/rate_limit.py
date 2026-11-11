@@ -58,15 +58,49 @@ account_limiter = SlidingWindowLimiter(settings.auth_rate_limit_per_minute)
 
 
 def client_ip(request: Request) -> str:
-    """Real client IP. Behind a trusted proxy (Render, a load balancer) the
-    direct peer is the proxy itself — keying limits on it would lump every
-    visitor into one bucket — so honour X-Forwarded-For *only* when the
-    deployment opts in via AEGIS_TRUST_PROXY."""
+    """Real client IP, resolved from the trusted end of the proxy chain.
+
+    `X-Forwarded-For` is attacker-controlled at its LEFT-most entries — a
+    client can prepend anything. Only the entries appended by hops we
+    control are trustworthy, so strip `trusted_proxy_hops` entries from
+    the RIGHT and take the entry that remains at that position. With one
+    trusted proxy (Render), the received chain is
+    "[client-claimed..., real client, proxy]" and hops=1 yields the real
+    client. Taking the left-most entry instead (the pre-F-02 behaviour)
+    let anyone mint a fresh rate-limit bucket per request by rotating
+    one header value.
+    """
     if settings.trust_proxy:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        hops = settings.trusted_proxy_hops
+        if hops >= 1:  # fail closed: an unverifiable chain is never trusted
+            forwarded = request.headers.get("x-forwarded-for", "")
+            parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+            if len(parts) > hops:
+                return parts[-hops - 1]
+            if parts:
+                return parts[0]
     return request.client.host if request.client else "unknown"
+
+
+# Second layer for the fetch budget: a caller who presents a valid access
+# token also spends from a per-account bucket, so rotating IPs (or sharing
+# one NAT egress) cannot multiply an authenticated caller's fetch budget.
+fetch_account_limiter = SlidingWindowLimiter(settings.fetch_rate_limit_per_minute)
+
+
+def _account_key(request: Request) -> str | None:
+    """User id from a valid Bearer access token, else None (anonymous)."""
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return None
+    from app.security import decode_token  # local import: avoids a cycle
+
+    try:
+        payload = decode_token(auth[7:].strip(), expected_type="access")
+    except Exception:
+        return None
+    sub = payload.get("sub")
+    return f"user:{sub}" if sub else None
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -77,6 +111,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         is_auth = request.url.path.startswith("/api/auth")
         is_fetch = request.url.path.startswith(_FETCH_PREFIXES)
         if is_fetch:
+            account_key = _account_key(request)
+            if account_key and not fetch_account_limiter.allow(account_key):
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many requests. Please slow down and try again shortly."},
+                    headers={"Retry-After": "60"},
+                )
             limiter, key = fetch_limiter, f"{client}:fetch"
         elif is_auth:
             limiter, key = auth_limiter, f"{client}:{request.url.path}"

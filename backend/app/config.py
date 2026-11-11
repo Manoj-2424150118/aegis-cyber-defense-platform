@@ -5,7 +5,7 @@ project runs locally out-of-the-box for demos and tests; production
 deployments MUST override ``AEGIS_SECRET_KEY`` (see ``.env.example``).
 """
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     fetch_rate_limit_per_minute: int = 12
     trending_cache_seconds: int = 60  # public trends are aggregates; serve them stale-tolerant
     trust_proxy: bool = False  # set True only behind a proxy that sets X-Forwarded-For
+    trusted_proxy_hops: int = 1  # trusted hops appended to X-Forwarded-For from the right
     max_upload_bytes: int = 10 * 1024 * 1024  # 10 MiB
     hibp_api_url: str = "https://api.pwnedpasswords.com/range/"
 
@@ -43,5 +44,18 @@ class Settings(BaseSettings):
                     return "postgresql+psycopg://" + v[len(prefix):]
         return v
 
+
+
+    @model_validator(mode="after")
+    def _validate_proxy_chain(self):
+        # F-03: trusting the proxy chain without knowing how many hops append
+        # to it makes the rate limiter key on attacker-controlled data
+        # (F-02). Refuse to start rather than run with a spoofable bucket.
+        if self.trust_proxy and self.trusted_proxy_hops < 1:
+            raise ValueError(
+                "AEGIS_TRUST_PROXY is on but AEGIS_TRUSTED_PROXY_HOPS < 1: "
+                "refusing to start with an unverifiable proxy chain."
+            )
+        return self
 
 settings = Settings()
