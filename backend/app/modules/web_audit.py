@@ -116,6 +116,30 @@ def audit_headers(url: str, headers: dict[str, str], cookies: list[str], https: 
         findings.append({"points": 15, "code": "cookies-ok", "message": "Cookies carry Secure, HttpOnly and SameSite protections."})
     else:
         findings.append({"points": 0, "code": "cookie-flags", "message": "Cookie problems: " + "; ".join(sorted(set(cookie_issues))) + "."})
+    # CSP strength (spec §5.8): presence alone is not protection — a
+    # policy with 'unsafe-inline'/'unsafe-eval' or a wildcard source
+    # lets the XSS it exists to stop straight through.
+    csp = lower.get("content-security-policy", "")
+    if csp:
+        directives: dict[str, str] = {}
+        for part in csp.split(";"):
+            tokens = part.strip().split(None, 1)
+            if tokens:
+                directives[tokens[0].lower()] = tokens[1] if len(tokens) > 1 else ""
+        script_src = directives.get("script-src", directives.get("default-src", ""))
+        style_src = directives.get("style-src", directives.get("default-src", ""))
+        if "'unsafe-inline'" in script_src or "'unsafe-inline'" in style_src:
+            findings.append({"points": 0, "code": "csp-unsafe-inline", "message": "The CSP allows 'unsafe-inline' — inline scripts/styles are permitted, which neutralises most of CSP's XSS protection. Move inline code into files or use nonces/hashes."})
+        if "'unsafe-eval'" in script_src:
+            findings.append({"points": 0, "code": "csp-unsafe-eval", "message": "The CSP allows 'unsafe-eval' — eval()-style code execution is permitted, a common XSS escape hatch. Remove it and refactor dynamic code."})
+        if "*" in script_src.split():
+            findings.append({"points": 0, "code": "csp-wildcard", "message": "The CSP's script sources include a bare wildcard (*) — scripts may load from anywhere, so the policy barely constrains an attacker."})
+    hsts = lower.get("strict-transport-security", "")
+    if hsts:
+        import re as _re
+        age = _re.search(r"max-age\s*=\s*(\d+)", hsts)
+        if age and int(age.group(1)) < 15_552_000:
+            findings.append({"points": 0, "code": "hsts-weak", "message": f"HSTS max-age is only {int(age.group(1)):,} seconds — browsers forget the policy quickly. Use at least 15552000 (180 days), ideally 31536000 with includeSubDomains."})
     if "server" in lower and any(ch.isdigit() for ch in lower["server"]):
         findings.append({"points": 0, "code": "server-version", "message": f"Server banner leaks version details ('{lower['server']}') that help attackers pick exploits."})
     if "x-powered-by" in lower:
@@ -171,4 +195,13 @@ def audit_website(raw_url: str, timeout: float = 8.0) -> dict:
         }
     result = audit_headers(final_url, headers, cookies, https=final_url.startswith("https://"))
     result["reachable"] = True
+    # Browser-side risk cannot be inspected remotely (spec §5.8), so
+    # every audit also ships the client-side hygiene playbook.
+    result["browser_guidance"] = [
+        "Keep the browser and OS on automatic updates — most drive-by exploitation targets known, patched bugs.",
+        "Use a password manager: it will not autofill your credentials on a look-alike domain.",
+        "Turn on Enhanced Protection (Chrome) / Strict tracking protection (Firefox) and DNS-over-HTTPS.",
+        "Remove extensions you do not recognise; an extension can read every page you visit.",
+        "Use a separate browser profile for banking and administration.",
+    ]
     return result

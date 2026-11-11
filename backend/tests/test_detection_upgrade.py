@@ -207,3 +207,27 @@ def test_file_html_smuggling_flagged():
     html = b"<html><script>var b=atob('TVqQ...');var u=URL.createObjectURL(new Blob([b]));</script></html>"
     r = scan_file("report.html", html)
     assert "html-smuggling" in _codes(r)
+
+
+# ── Phase 8: web-audit CSP strength + HSTS quality (spec §5.8) ─────
+
+from app.modules.web_audit import audit_headers
+
+
+def test_audit_weak_csp_flagged_without_score_change():
+    strong = audit_headers("https://x.example", {
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "content-security-policy": "default-src 'self'; script-src 'self'",
+        "x-content-type-options": "nosniff", "x-frame-options": "DENY",
+        "referrer-policy": "no-referrer", "permissions-policy": "camera=()",
+    }, [], https=True)
+    weak = audit_headers("https://x.example", {
+        "strict-transport-security": "max-age=300",
+        "content-security-policy": "default-src *; script-src 'unsafe-inline' 'unsafe-eval' *",
+        "x-content-type-options": "nosniff", "x-frame-options": "DENY",
+        "referrer-policy": "no-referrer", "permissions-policy": "camera=()",
+    }, [], https=True)
+    codes = _codes(weak)
+    assert {"csp-unsafe-inline", "csp-unsafe-eval", "csp-wildcard", "hsts-weak"} <= codes
+    assert "csp-unsafe-inline" not in _codes(strong)
+    assert weak["score"] == strong["score"]  # notes never move the posture score
