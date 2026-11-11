@@ -209,6 +209,26 @@ export default function App() {
   const [filter, setFilter] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   const heroInputRef = useRef<HTMLTextAreaElement>(null);
+  const navToggleRef = useRef<HTMLButtonElement>(null);
+  const navSheetRef = useRef<HTMLDivElement>(null);
+  const navWasOpen = useRef(false);
+
+  // Mobile sheet: lock scroll while open, move focus into the sheet,
+  // and return focus to the toggle when it closes (Escape included).
+  useEffect(() => {
+    if (navOpen) {
+      navWasOpen.current = true;
+      document.body.style.overflow = "hidden";
+      navSheetRef.current?.querySelector("a")?.focus();
+    } else {
+      document.body.style.overflow = "";
+      if (navWasOpen.current) {
+        navWasOpen.current = false;
+        navToggleRef.current?.focus();
+      }
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [navOpen]);
 
   const focusHero = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -259,6 +279,19 @@ export default function App() {
   ];
   const visibleTools = TOOLS.filter((t) => `${t.name} ${t.kw}`.toLowerCase().includes(filter.trim().toLowerCase()));
 
+  // Scroll-spy for the sticky tool nav: highlight the tool in view.
+  const [activeTool, setActiveTool] = useState<string>("");
+  useEffect(() => {
+    const cards = TOOL_NAV.map((t) => document.getElementById(t.anchor)).filter((el): el is HTMLElement => !!el);
+    if (!("IntersectionObserver" in window) || cards.length === 0) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((en) => { if (en.isIntersecting) setActiveTool(en.target.id); }),
+      { rootMargin: "-30% 0px -60% 0px" },
+    );
+    cards.forEach((c) => io.observe(c));
+    return () => io.disconnect();
+  }, [filter]);
+
   // Live platform status — real data from /health, shown in nav + footer.
   useEffect(() => {
     const ctrl = new AbortController();
@@ -296,13 +329,13 @@ export default function App() {
     { label: "Coverage", href: "#coverage" },
     { label: "Trending", href: "#trending" },
     { label: "How it works", href: "#how" },
-    { label: "Privacy", href: "#privacy" },
+    { label: "Trust", href: "#privacy" },
     { label: "FAQ", href: "#faq" },
   ];
 
   return (
     <div>
-      <a className="skip-link" href="#tools">Skip to the tools</a>
+      <a className="skip-link" href="#main">Skip to main content</a>
       <nav className="nav" aria-label="Main">
         <div className="nav-inner">
           <a className="brand" href="#top" aria-label="Aegis home">
@@ -321,6 +354,7 @@ export default function App() {
             <a className="btn ghost btn-sm" href="#tool-vault">Sign in</a>
             <button type="button" className="btn primary btn-sm" onClick={focusHero}>Run a free scan</button>
             <button
+              ref={navToggleRef}
               type="button"
               className="icon-btn nav-toggle"
               aria-expanded={navOpen}
@@ -331,7 +365,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className={`nav-sheet${navOpen ? " open" : ""}`}>
+        <div ref={navSheetRef} className={`nav-sheet${navOpen ? " open" : ""}`}>
           {NAV_LINKS.map((l) => <a key={l.href} href={l.href} onClick={() => setNavOpen(false)}>{l.label}</a>)}
           <a href="#tool-vault" onClick={() => setNavOpen(false)}>Sign in to the vault</a>
         </div>
@@ -401,7 +435,7 @@ export default function App() {
           <ProductPanel />
         </header>
 
-        <main>
+        <main id="main">
           <section id="coverage" className="section reveal">
             <p className="eyebrow">Coverage</p>
             <h2 className="section-title">What it covers</h2>
@@ -424,7 +458,16 @@ export default function App() {
             <h2 className="section-title">Run a check</h2>
             <p className="section-sub">No account needed. Every check runs live in front of you, and every finding comes with a suggested fix.</p>
             <div className="tool-nav" aria-label="Jump to a tool">
-              {TOOL_NAV.map((t) => <a key={t.anchor} href={`#${t.anchor}`}>{t.label}</a>)}
+              {TOOL_NAV.map((t) => (
+                <a
+                  key={t.anchor}
+                  href={`#${t.anchor}`}
+                  className={activeTool === t.anchor ? "active" : undefined}
+                  aria-current={activeTool === t.anchor ? "true" : undefined}
+                >
+                  {t.label}
+                </a>
+              ))}
             </div>
             <div className="tool-filter">
               <div className="field">
