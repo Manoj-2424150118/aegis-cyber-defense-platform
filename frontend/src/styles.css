@@ -132,6 +132,7 @@ strong { font-weight: 600; }
   text-wrap: balance;
 }
 .section-sub { color: var(--text-2); margin: 0 0 32px; max-width: 68ch; font-size: 1rem; }
+.meta-line { margin: -16px 0 24px; }
 .meta { color: var(--text-2); font-size: 0.8125rem; font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; }
 .hint { color: var(--text-2); font-size: 0.9375rem; margin: 8px 0 16px; }
 

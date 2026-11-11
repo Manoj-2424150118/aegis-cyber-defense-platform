@@ -157,9 +157,10 @@ function RankList({ items, mono = false }: { items: { name: string; count: numbe
 
 function TrendingSection() {
   const [data, setData] = useState<Trending | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   useEffect(() => {
     let live = true;
-    api.getTrending().then((d) => { if (live) setData(d); }).catch(() => { /* trends are a bonus, never block the page */ });
+    api.getTrending().then((d) => { if (live) { setData(d); setUpdatedAt(new Date()); } }).catch(() => { /* trends are a bonus, never block the page */ });
     return () => { live = false; };
   }, []);
   if (!data) return null;
@@ -168,6 +169,7 @@ function TrendingSection() {
       <p className="eyebrow">Trending threats</p>
       <h2 className="section-title">What people are checking</h2>
       <p className="section-sub">Live aggregates from this platform's own scans over the last {data.window_days} days. Only verdicts, impersonated brand names and repeat flagged domains are counted; submitted links, emails and messages are never stored or shown.</p>
+      {updatedAt && <p className="meta meta-line">Updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · window: last {data.window_days} days</p>}
       {data.total_scans === 0 ? (
         <p className="meta">No scans recorded yet in this window. Run any check above and it will be counted here — in aggregate only.</p>
       ) : (
