@@ -33,13 +33,22 @@ def _sse(payload: dict) -> str:
 
 
 async def _emit_stages(gen, total_steps: int, tool: str):
-    """Emit one SSE step per engine stage, after that stage has executed."""
+    """Emit one SSE step per engine stage, after that stage has executed.
+
+    Each new finding is additionally emitted as a typed ``signal``
+    event (spec §11) carrying the v2 Signal view, so consumers can
+    render evidence as it is produced instead of re-deriving it from
+    the final payload."""
+    from app.modules.detection import signal_from_finding
+
     yield _sse({"type": "start", "tool": tool, "total_steps": total_steps})
     for index, (label, new_findings, running) in enumerate(gen, 1):
         yield _sse({
             "type": "step", "index": index, "label": label, "status": "done",
             "findings": new_findings, "running_score": running,
         })
+        for finding in new_findings:
+            yield _sse({"type": "signal", "signal": signal_from_finding(finding, tool)})
         await asyncio.sleep(PACING_SECONDS)
 
 

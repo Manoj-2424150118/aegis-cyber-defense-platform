@@ -11,6 +11,7 @@ from app.modules.email_analyzer import analyze_email
 from app.modules.file_scanner import scan_file
 from app.modules.message_analyzer import analyze_message
 from app.modules.secret_scanner import scan_secrets
+from app.modules import smart_scan
 from app.modules.url_analyzer import analyze_url
 
 
@@ -246,3 +247,45 @@ def test_secret_scanner_new_provider_formats():
     assert {"secret-anthropic-key", "secret-npm-token", "secret-twilio-key"} <= codes
     import json as _json
     assert "x" * 30 not in _json.dumps(r)  # masked, never raw
+
+
+# ── Phase 10: smart-scan aggregation, SSE signals, endpoints ───────
+
+def test_smart_scan_message_with_secret_also_runs_secret_engine():
+    out = smart_scan.smart_scan("Please pay the parcel fee with card 4111 1111 1111 1111 today")
+    assert out["detected_type"] == "message"
+    assert "secret" in out["engines_ran"]
+    assert out["sub_results"] and out["sub_results"][0]["detected_type"] == "secret"
+    assert out["risk_score"] == max(out["result"]["risk_score"], out["sub_results"][0]["risk_score"])
+
+
+def test_batch_endpoint_bounded_and_routed(client):
+    r = client.post("/api/tools/batch", json={"items": [
+        {"kind": "url", "input": "http://192.168.10.5/paypal/login"},
+        {"kind": "message", "input": "hello there friend"},
+        {"kind": "password", "input": "Tr7!mango-BICYCLE-92#quartz"},
+    ]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["count"] == 3
+    assert body["results"][0]["risk_score"] >= 70
+    assert body["results"][2]["kind"] == "password"
+    too_many = client.post("/api/tools/batch", json={"items": [{"kind": "message", "input": "x"}] * 11})
+    assert too_many.status_code == 422
+
+
+def test_attachment_alias_matches_file_endpoint(client):
+    data = b"MZ" + b"\x00" * 32
+    a = client.post("/api/tools/file", files={"file": ("x.pdf", data)}).json()
+    b = client.post("/api/tools/attachment", files={"file": ("x.pdf", data)}).json()
+    assert a["risk_score"] == b["risk_score"] and a["sha256"] == b["sha256"]
+
+
+def test_qr_endpoint_is_honest_when_no_decoder(client):
+    r = client.post("/api/tools/qr", files={"file": ("qr.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)})
+    assert r.status_code == 200
+    body = r.json()
+    # No decoder library exists in this environment: the contract is
+    # degraded + inconclusive, never a fabricated 'safe'.
+    assert body["verdict"] == "inconclusive" and body["risk_score"] is None
+    assert body["meta"]["degraded"] is True

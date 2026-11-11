@@ -100,7 +100,13 @@ def classify_input(text: str) -> str:
 
 
 def smart_scan(text: str) -> dict:
-    """Classify *text*, run the matching engine, return one envelope."""
+    """Classify *text*, run the matching engine(s), return one envelope.
+
+    Aggregation (spec §5.10): a component the classifier did not pick
+    as primary is never silently ignored — a *message* that also
+    carries a recognisable credential format is additionally run
+    through the Secret Scanner, reported in ``sub_results``, and the
+    envelope verdict is the more severe of the two."""
     stripped = text.strip()
     kind = classify_input(stripped)
     if kind == "url":
@@ -112,11 +118,31 @@ def smart_scan(text: str) -> dict:
         result = email_analyzer.analyze_email(headers, body)
     else:
         result = message_analyzer.analyze_message(stripped)
+
+    sub_results: list[dict] = []
+    engines_ran = [kind]
+    if kind == "message" and secret_scanner.coarse_detect(stripped):
+        secret_result = secret_scanner.scan_secrets(stripped)
+        engines_ran.append("secret")
+        sub_results.append({
+            "detected_type": "secret",
+            "tool": _TOOL_LABELS["secret"],
+            "verdict": secret_result["verdict"],
+            "risk_score": secret_result["risk_score"],
+            "result": secret_result,
+        })
+
+    verdict, score = result["verdict"], result["risk_score"]
+    for sub in sub_results:
+        if sub["risk_score"] > score:
+            verdict, score = sub["verdict"], sub["risk_score"]
     return {
         "detected_type": kind,
         "detected_label": _TYPE_LABELS[kind],
         "tool": _TOOL_LABELS[kind],
-        "verdict": result["verdict"],
-        "risk_score": result["risk_score"],
+        "verdict": verdict,
+        "risk_score": score,
         "result": result,
+        "engines_ran": engines_ran,
+        "sub_results": sub_results,
     }

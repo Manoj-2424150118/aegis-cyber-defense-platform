@@ -22,6 +22,7 @@ from app.deps import get_current_user
 from app.models import ScanEvent, ScanHistory, User
 from app.modules import (
     domain_checker,
+    qr_scan,
     email_analyzer,
     file_scanner,
     message_analyzer,
@@ -36,6 +37,7 @@ from app.modules import (
 from app.modules.detection import enrich_meta
 from app.rate_limit import client_ip
 from app.schemas import (
+    BatchRequest,
     DomainRequest,
     EmailRequest,
     GenerateRequest,
@@ -192,6 +194,7 @@ async def _read_upload_capped(file: UploadFile) -> bytes:
 
 
 @router.post("/file")
+@router.post("/attachment")
 async def scan_upload(file: UploadFile = File(...)):
     data = await _read_upload_capped(file)
     return file_scanner.scan_file(file.filename or "upload", data)
@@ -313,6 +316,70 @@ async def smart_scan_endpoint(body: SmartScanRequest, request: Request):
         _record_event("message", result["verdict"], result["risk_score"], codes=codes,
                       source=client_ip(request))
     return envelope
+
+
+@router.post("/batch")
+async def batch_scan(body: BatchRequest):
+    """Batch analysis (spec §11): each item runs the same engine as
+    its single-scan endpoint. Batch results are deliberately NOT
+    recorded to the public trending aggregate — a bulk caller must
+    not be able to move the public counters 10 items at a time."""
+    results: list[dict] = []
+    for item in body.items:
+        kind = item.kind.lower().strip()
+        text = item.input
+        if kind == "url":
+            report = url_analyzer.analyze_url(text).as_dict()
+            results.append({"kind": "url", "risk_score": report["risk_score"],
+                            "verdict": report["verdict"], "result": report})
+        elif kind == "email":
+            headers, body_text = smart_scan.split_email(text.strip())
+            report = email_analyzer.analyze_email(headers, body_text)
+            results.append({"kind": "email", "risk_score": report["risk_score"],
+                            "verdict": report["verdict"], "result": report})
+        elif kind == "message":
+            report = message_analyzer.analyze_message(text)
+            results.append({"kind": "message", "risk_score": report["risk_score"],
+                            "verdict": report["verdict"], "result": report})
+        elif kind == "secret":
+            report = secret_scanner.scan_secrets(text)
+            results.append({"kind": "secret", "risk_score": report["risk_score"],
+                            "verdict": report["verdict"], "result": report})
+        elif kind == "password":
+            # Strength only — breach lookups are network calls and are
+            # not multiplied by batch size.
+            report = password_lab.assess_password(text)
+            results.append({"kind": "password", "risk_score": report["score"],
+                            "verdict": report["label"], "result": report})
+        else:
+            envelope = smart_scan.smart_scan(text)
+            results.append({"kind": envelope["detected_type"],
+                            "risk_score": envelope["risk_score"],
+                            "verdict": envelope["verdict"], "result": envelope})
+    return {"count": len(results), "results": results}
+
+
+@router.post("/qr")
+async def qr_scan_endpoint(file: UploadFile = File(...)):
+    """QR-code scan (spec §11): decode the image, then run the payload
+    through Smart Scan. Without a decoder library in the deployment
+    this returns an honest degraded *inconclusive* — never a
+    fabricated safe verdict for a code nobody actually read."""
+    data = await _read_upload_capped(file)
+    decoded = qr_scan.try_decode(data)
+    if decoded is None:
+        return qr_scan.inconclusive_result()
+    envelope = smart_scan.smart_scan(decoded)
+    return {
+        "tool": "qr",
+        "detected_type": "qr",
+        "decoded_text": decoded if len(decoded) <= 2048 else decoded[:2048] + "…",
+        "verdict": envelope["verdict"],
+        "risk_score": envelope["risk_score"],
+        "result": envelope,
+        "meta": {"schema_version": "2.0", "engine": "qr", "sources_used": ["qr-decode"],
+                 "degraded": False, "cached": False},
+    }
 
 
 # ── Live-streamed analysis (Server-Sent Events) ──────────────────────

@@ -108,6 +108,14 @@ def _luhn_ok(digits: str) -> bool:
     return total % 10 == 0
 
 
+def coarse_detect(text: str) -> bool:
+    """Broader, cheaper-than-a-scan check used for co-detection: any
+    strong format, a Luhn-shaped card candidate, or a secret-looking
+    KEY = value assignment. False positives cost one extra in-memory
+    scan; false negatives would silently drop a component."""
+    return bool(quick_detect(text) or _CARD.search(text) or _ASSIGNMENT.search(text))
+
+
 def quick_detect(text: str) -> bool:
     """Cheap strong-format check used by Smart Scan routing: does this
     blob contain a recognisable credential format at all?"""

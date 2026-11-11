@@ -94,3 +94,16 @@ class VaultCreateRequest(BaseModel):
 
 class VaultOpenRequest(BaseModel):
     master_password: str = Field(min_length=1, max_length=128)
+
+
+class BatchItem(BaseModel):
+    """One item of a batch scan: an explicit kind, or "smart" to let
+    Smart Scan classify the input."""
+    kind: str = Field(default="smart", max_length=16)
+    input: str = Field(min_length=1, max_length=20000)
+
+
+class BatchRequest(BaseModel):
+    """Bounded batch analysis (spec §11): at most 10 items per call,
+    each routed to the same engines the single-scan endpoints use."""
+    items: list[BatchItem] = Field(min_length=1, max_length=10)
