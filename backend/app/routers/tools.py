@@ -147,13 +147,13 @@ def _record_event(scan_type: str, verdict: str, risk_score: int, domain: str | N
 # makes the headline count a standing invitation to slow inflation).
 # Pruned opportunistically on the write path, at most once an hour.
 _RETENTION_DAYS = 30
-_last_prune = 0.0
+_last_prune: float | None = None
 
 
 def _prune_old_events(db: Session) -> None:
     global _last_prune
     now_mono = _time.monotonic()
-    if now_mono - _last_prune < 3600:
+    if _last_prune is not None and now_mono - _last_prune < 3600:
         return
     _last_prune = now_mono
     cutoff = datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)

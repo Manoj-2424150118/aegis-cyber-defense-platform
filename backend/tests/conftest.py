@@ -31,7 +31,7 @@ def _fresh_state():
     fetch_account_limiter.reset()
     tools_router._recent_events.clear()
     tools_router._signature_events.clear()
-    tools_router._last_prune = 0.0
+    tools_router._last_prune = None
     tools_router._trending_cache = None
     yield
 
