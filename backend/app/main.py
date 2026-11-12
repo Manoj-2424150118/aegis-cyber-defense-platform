@@ -68,15 +68,39 @@ THREAT_MODEL = [
 ]
 
 
+def _worker_constraint_warning() -> str | None:
+    """F-09: every limiter and anti-poisoning cap in this codebase is
+    per-process (in-memory sliding windows). Running more than one
+    worker silently multiplies every budget by the worker count and
+    splits account lockouts across processes. Until the limiter store
+    moves to a shared backend (Redis — the interface is one method,
+    ``allow(key)``), the deployment MUST run exactly one worker.
+    WEB_CONCURRENCY is the conventional signal; when it is absent we
+    cannot introspect the worker count, so the constraint is also
+    stated in the README and both Dockerfiles."""
+    raw = os.environ.get("WEB_CONCURRENCY", "")
+    if raw and raw != "1":
+        return (
+            f"WEB_CONCURRENCY={raw}: rate limiters and lockouts are per-process "
+            "in this build — budgets multiply per worker. Run exactly ONE worker "
+            "until the limiter store is shared (see README, 'Deployment constraint')."
+        )
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Log only the mode as a literal: interpolating settings values here
+    # trips clear-text-logging scanners (the settings object also holds
+    # the secret key), and the hop count adds nothing operationally.
     logger.info(
         "rate-limit client IP source: %s",
-        f"proxy-chain (trusted hops={settings.trusted_proxy_hops})"
-        if settings.trust_proxy
-        else "socket-peer",
+        "proxy-chain" if settings.trust_proxy else "socket-peer",
     )
+    warning = _worker_constraint_warning()
+    if warning:
+        logger.warning(warning)
     yield
 
 
