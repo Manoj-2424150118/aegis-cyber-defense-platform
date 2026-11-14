@@ -71,6 +71,13 @@ THREAT_MODEL = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Log only the mode as a literal: interpolating settings values here
+    # trips clear-text-logging scanners (the settings object also holds
+    # the secret key), and the hop count adds nothing operationally.
+    logger.info(
+        "rate-limit client IP source: %s",
+        "proxy-chain" if settings.trust_proxy else "socket-peer",
+    )
     yield
 
 
