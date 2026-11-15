@@ -40,7 +40,7 @@ IOC_PATTERNS = {
     "macro-autoexec": re.compile(rb"(AutoOpen|Document_Open|Auto_Open|Workbook_Open)", re.I),
     "shell-dropper": re.compile(rb"(curl|wget)\s+[^\n]{0,100}\|\s*(sh|bash)", re.I),
     "base64-pe": re.compile(rb"TVqQ[A-Za-z0-9+/=]{40,}"),  # 'TVqQ' = base64 of 'MZ' header
-    "crypto-wallet-address": re.compile(rb"\b(bc1|[13])[a-zA-HJ-NP-Za-km-z]{25,39}\b"),
+    "crypto-wallet-address": re.compile(rb"\b(bc1|[13])[a-zA-HJ-NP-Z]{25,39}\b"),
     "crypto-wallet-eth": re.compile(rb"\b0x[a-fA-F0-9]{40}\b"),
     "mshta-dropper": re.compile(rb"mshta\s+(https?://|javascript:|vbscript:)", re.I),
     "rundll32-dropper": re.compile(rb"rundll32\s+[^\\n]{0,80}(javascript:|https?://|,)", re.I),
