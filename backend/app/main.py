@@ -136,13 +136,23 @@ def _safe_static_path(static_root: Path, path: str) -> Path | None:
     The ``{path}`` segment is user-controlled: without resolving and
     containing it, ``../`` (or an absolute path) escapes the static dir
     and FileResponse serves arbitrary files from the container
-    (CodeQL py/path-injection #6/#7). Symlinks inside the dir that
-    point outside are rejected the same way.
+    (CodeQL py/path-injection #6/#7). The containment check runs
+    *before* any filesystem call on the user-derived path, so no
+    tainted path reaches the filesystem unguarded: normpath collapses
+    ``..`` lexically, then a second resolve + re-check catches
+    symlinks inside the dir that point outside.
     """
+    if not path:
+        return None
     root = static_root.resolve()
-    candidate = (root / path).resolve()
-    if path and candidate.is_file() and candidate.is_relative_to(root):
-        return candidate
+    candidate = Path(os.path.normpath(root / path))
+    if not candidate.is_relative_to(root):
+        return None
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(root):
+        return None
+    if resolved.is_file():
+        return resolved
     return None
 
 
