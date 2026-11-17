@@ -130,14 +130,30 @@ def root():
 # When a built frontend is present (AEGIS_STATIC_DIR or ./static next to the
 # backend), serve the SPA from the same origin so the whole platform deploys
 # as ONE free-tier web service. API routes above always take precedence.
+def _safe_static_path(static_root: Path, path: str) -> Path | None:
+    """Resolve a SPA request path strictly inside the static dir.
+
+    The ``{path}`` segment is user-controlled: without resolving and
+    containing it, ``../`` (or an absolute path) escapes the static dir
+    and FileResponse serves arbitrary files from the container
+    (CodeQL py/path-injection #6/#7). Symlinks inside the dir that
+    point outside are rejected the same way.
+    """
+    root = static_root.resolve()
+    candidate = (root / path).resolve()
+    if path and candidate.is_file() and candidate.is_relative_to(root):
+        return candidate
+    return None
+
+
 _STATIC_DIR = Path(os.environ.get("AEGIS_STATIC_DIR", Path(__file__).resolve().parents[1] / "static"))
 if _STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa_fallback(path: str):
-        candidate = _STATIC_DIR / path
-        if path and candidate.is_file():
+        candidate = _safe_static_path(_STATIC_DIR, path)
+        if candidate is not None:
             return FileResponse(candidate)
         index = _STATIC_DIR / "index.html"
         if index.is_file():
