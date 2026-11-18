@@ -80,6 +80,29 @@ def test_web_audit_stream_blocks_ssrf(client):
     assert "result" not in types
 
 
+def test_stream_engine_failure_yields_generic_error_not_traceback(client, monkeypatch):
+    """An unexpected engine failure mid-stream must end the SSE stream
+    with a generic ``error`` event — never an aborted response, and
+    never the exception text/traceback (CodeQL py/stack-trace-exposure).
+    """
+    import app.streaming as streaming
+
+    def _boom(url):
+        raise RuntimeError("boom-secret-marker")
+
+    monkeypatch.setattr(streaming, "iter_url_stages", _boom)
+    r = client.post("/api/tools/url/stream", json={"url": PHISH_URL})
+    assert r.status_code == 200
+    events = _events(r)
+    # the engine fails before the first stage runs, so no "start" step
+    # is emitted — the stream still ends cleanly with a generic error
+    assert events[-1]["type"] == "error"
+    assert events[-1]["message"] == "The live scan hit an unexpected error. Please try again."
+    assert "result" not in [e["type"] for e in events]
+    assert "boom-secret-marker" not in r.text
+    assert "Traceback" not in r.text
+
+
 def test_stream_zip_bomb_parity(client):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:

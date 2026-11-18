@@ -11,7 +11,9 @@ covered by tests).
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
+import logging
 
 from app.modules import domain_checker, tls_inspector, web_audit
 from app.modules.detection import enrich_meta
@@ -25,11 +27,40 @@ from app.modules.message_analyzer import (
 from app.modules.password_lab import assess_password, breach_check
 from app.modules.url_analyzer import analyze_url, iter_url_stages
 
+logger = logging.getLogger(__name__)
+
 PACING_SECONDS = 0.35
 
 
 def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
+
+
+def _guarded_stream(func):
+    """Guard a streaming generator so an unexpected engine failure ends
+    the SSE stream with a generic ``error`` event instead of aborting
+    the response mid-stream.
+
+    Without this, an exception raised inside a stage (or in the final
+    ``result`` computation) propagates out of the ``StreamingResponse``
+    body iterator: the connection drops with no error event for the
+    client, and the traceback is exposed to the server error path
+    (CodeQL py/stack-trace-exposure). The exception detail is logged
+    server-side only — the client sees a fixed generic message.
+    """
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            async for chunk in func(*args, **kwargs):
+                yield chunk
+        except Exception:
+            logger.exception("stream %s failed unexpectedly", func.__name__)
+            yield _sse({
+                "type": "error",
+                "message": "The live scan hit an unexpected error. Please try again.",
+            })
+
+    return wrapper
 
 
 async def _emit_stages(gen, total_steps: int, tool: str):
@@ -43,6 +74,7 @@ async def _emit_stages(gen, total_steps: int, tool: str):
         await asyncio.sleep(PACING_SECONDS)
 
 
+@_guarded_stream
 async def stream_url(url: str):
     from app.modules.url_analyzer import URL_STAGES
 
@@ -51,6 +83,7 @@ async def stream_url(url: str):
     yield _sse({"type": "result", "result": analyze_url(url).as_dict()})
 
 
+@_guarded_stream
 async def stream_email(headers: str, body: str):
     from app.modules.email_analyzer import EMAIL_STAGES
 
@@ -59,12 +92,14 @@ async def stream_email(headers: str, body: str):
     yield _sse({"type": "result", "result": analyze_email(headers, body)})
 
 
+@_guarded_stream
 async def stream_message(text: str):
     async for chunk in _emit_stages(iter_message_stages(text), len(MESSAGE_STAGES), "message"):
         yield chunk
     yield _sse({"type": "result", "result": analyze_message(text)})
 
 
+@_guarded_stream
 async def stream_domain(domain: str):
     """DNS lookups happen once (in an executor — they block), then the
     genuine evaluation stages are emitted one by one, like the other
@@ -92,6 +127,7 @@ async def stream_domain(domain: str):
          "findings": ctx.findings}, "domain", sources_used=("dns",))})
 
 
+@_guarded_stream
 async def stream_tls(host: str):
     yield _sse({"type": "start", "tool": "tls", "total_steps": 3})
     loop = asyncio.get_running_loop()
@@ -115,6 +151,7 @@ async def stream_tls(host: str):
     yield _sse({"type": "result", "result": enrich_meta(report, "tls", sources_used=("tls-handshake",))})
 
 
+@_guarded_stream
 async def stream_file(filename: str, data: bytes):
     from app.modules.file_scanner import FILE_STAGES
 
@@ -123,6 +160,7 @@ async def stream_file(filename: str, data: bytes):
     yield _sse({"type": "result", "result": scan_file(filename, data)})
 
 
+@_guarded_stream
 async def stream_password(password: str):
     yield _sse({"type": "start", "tool": "password", "total_steps": 2})
     assessment = assess_password(password)
@@ -144,6 +182,7 @@ async def stream_password(password: str):
     yield _sse({"type": "result", "result": {**assessment, "breach": breach}})
 
 
+@_guarded_stream
 async def stream_web_audit(raw_url: str):
     from urllib.parse import urlparse
 
