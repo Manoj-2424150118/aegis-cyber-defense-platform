@@ -14,6 +14,9 @@ so its lookup parameter is validated strictly before any DNS lookup:
 * Domain names must match ``DOMAIN_REGEX``: dot-separated labels of
   1–63 chars, never starting or ending with a hyphen, and an alphabetic
   TLD of at least two characters.
+* ``is_public_unicast`` decides whether a resolved address may be
+  connected to at all: an explicit allow of genuinely public unicast
+  addresses (never a denylist), used by the SSRF guard.
 
 The frontend mirrors these exact rules in ``frontend/src/api.ts`` so a
 bad lookup is rejected in the browser before a request is ever made.
@@ -27,6 +30,40 @@ from urllib.parse import urlparse
 # non-capturing group around it, otherwise the pattern is a syntax error.
 DOMAIN_REGEX = re.compile(r"^(?:(?!-)[A-Za-z0-9-]{1,63}(?<!-)\.)+[A-Za-z]{2,}$")
 IP_REGEX = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+
+
+def is_public_unicast(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """True only for a genuinely public, routable unicast address.
+
+    ``ip.is_global`` alone is NOT sufficient (F-01): it returns True for
+    NAT64 well-known-prefix addresses (``64:ff9b::/96`` — which a network
+    with IPv6 egress translates to the embedded IPv4, e.g. the cloud
+    metadata address) and for multicast. So deny every non-public class
+    by name, and for transition mechanisms that embed an IPv4 address
+    (IPv4-mapped, 6to4, Teredo, NAT64) judge the embedded address — or
+    refuse the prefix outright where the platform's translation
+    behaviour cannot be trusted.
+    """
+    if ip.is_multicast or ip.is_unspecified:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address):
+        # NAT64 WKP, 6to4 and Teredo embed an IPv4 address whose meaning
+        # depends on translation behaviour outside this host's control;
+        # reject the prefixes outright rather than trusting translation.
+        if ip in ipaddress.ip_network("64:ff9b::/96"):
+            return False
+        if ip in ipaddress.ip_network("2002::/16"):
+            return False
+        if ip.teredo is not None:
+            return False
+        # IPv4-mapped addresses MEAN their embedded IPv4 address — judge
+        # that (the stdlib classifies the mapped range inconsistently
+        # across Python versions: reserved on 3.12, not-global elsewhere).
+        if ip.ipv4_mapped is not None:
+            return is_public_unicast(ip.ipv4_mapped)
+    if ip.is_reserved or ip.is_loopback or ip.is_link_local or ip.is_private:
+        return False
+    return ip.is_global
 
 
 def is_valid_ipv4(host: str) -> bool:

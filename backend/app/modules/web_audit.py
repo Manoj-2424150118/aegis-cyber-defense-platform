@@ -9,6 +9,7 @@ frame-ancestors, X-Content-Type-Options, Referrer-Policy, cookie flags
 Only public headers are read; no intrusive probing is performed.
 """
 
+import http.client
 import ipaddress
 import socket
 import ssl
@@ -16,21 +17,22 @@ import urllib.request
 from urllib.parse import urlparse
 
 from app.modules.remediation import fix_for
-from app.validation import is_valid_host
+from app.validation import is_public_unicast, is_valid_host
 
 
 class UnsafeUrlError(ValueError):
     """Raised when a URL points at a non-public address (SSRF guard)."""
 
 
-def assert_public_host(hostname: str) -> None:
-    """Reject loopback / private / link-local / reserved targets.
+def resolve_public_addresses(hostname: str) -> list[str]:
+    """Resolve ``hostname`` once and return its addresses — but only if
+    EVERY resolved address is a genuinely public unicast address
+    (``is_public_unicast``). A host answering with one public and one
+    private address is an attack, not a partial success.
 
-    Without this, the audit endpoint is a textbook SSRF primitive: anyone
-    could make the server fetch cloud metadata (169.254.169.254) or internal
-    admin panels. Every hostname is resolved and *every* resulting address
-    must be a public one. Redirect targets are re-checked by the opener
-    below, which closes the redirect-to-internal bypass.
+    Callers must connect to one of the returned addresses, never to the
+    name: re-resolving at connect time is the DNS-rebinding (TOCTOU)
+    hole this helper exists to close.
     """
     if not hostname:
         raise UnsafeUrlError("URL has no host.")
@@ -44,12 +46,80 @@ def assert_public_host(hostname: str) -> None:
         infos = socket.getaddrinfo(hostname, None, proto=socket.IPPROTO_TCP)
     except socket.gaierror as exc:
         raise UnsafeUrlError(f"Host '{hostname}' does not resolve.") from exc
+    addresses: list[str] = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if not ip.is_global:
+        if not is_public_unicast(ip):
             raise UnsafeUrlError(
                 f"Refusing to audit '{hostname}': it resolves to a non-public address ({ip})."
             )
+        addresses.append(str(ip))
+    if not addresses:
+        raise UnsafeUrlError(f"Host '{hostname}' does not resolve.")
+    return addresses
+
+
+def assert_public_host(hostname: str) -> None:
+    """Reject loopback / private / link-local / reserved / translated /
+    multicast targets.
+
+    Without this, the audit endpoint is a textbook SSRF primitive: anyone
+    could make the server fetch cloud metadata (169.254.169.254) or internal
+    admin panels. Every hostname is resolved and *every* resulting address
+    must pass ``is_public_unicast`` — a bare ``is_global`` test is not
+    enough (it accepts NAT64-translated and multicast addresses, F-01).
+    Redirect targets are re-checked by the opener below, which closes the
+    redirect-to-internal bypass, and connections are pinned to the
+    validated addresses (see ``_dial_pinned``).
+    """
+    resolve_public_addresses(hostname)
+
+
+def _dial_pinned(host: str, port: int, timeout: float) -> socket.socket:
+    """Connect to a validated address for ``host`` — never to the name.
+
+    The guard resolves and validates; the fetch used to resolve AGAIN
+    independently, so a short-TTL name could answer public for the check
+    and private for the connect (DNS rebinding). Dialing only addresses
+    returned by ``resolve_public_addresses`` — which re-validates every
+    answer at dial time — removes the second, unchecked resolution.
+    Do not "simplify" this back to connecting to the hostname.
+    """
+    addresses = resolve_public_addresses(host)
+    last_exc: OSError | None = None
+    for ip in addresses:
+        try:
+            return socket.create_connection((ip, port), timeout=timeout)
+        except OSError as exc:
+            last_exc = exc
+    if last_exc is not None:
+        raise last_exc
+    raise UnsafeUrlError(f"Host '{host}' does not resolve.")  # unreachable: addresses is non-empty
+
+
+class _PinnedHTTPConnection(http.client.HTTPConnection):
+    def connect(self) -> None:  # noqa: D102 - see _dial_pinned
+        self.sock = _dial_pinned(self.host, self.port, self.timeout)
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self) -> None:  # noqa: D102 - see _dial_pinned
+        self.sock = _dial_pinned(self.host, self.port, self.timeout)
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        # server_hostname stays the ORIGINAL name, so certificate
+        # validation still applies to the real host, not the pinned IP.
+        self.sock = self._context.wrap_socket(self.sock, server_hostname=self.host)
+
+
+class _PinnedHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):  # noqa: D102
+        return self.do_open(_PinnedHTTPConnection, req)
+
+
+class _PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):  # noqa: D102
+        return self.do_open(_PinnedHTTPSConnection, req, context=self._context)
 
 
 class _GuardedRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -145,8 +215,13 @@ def _fetch_guarded(url: str, timeout: float = 8.0):
         method="GET",
     )
     ctx = ssl.create_default_context()
-    opener = urllib.request.build_opener(_GuardedRedirectHandler(), urllib.request.HTTPSHandler(context=ctx))
-    with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced by caller + handler
+    opener = urllib.request.build_opener(
+        # ProxyHandler({}) disables environment proxies on purpose: a
+        # proxy would resolve the name itself and defeat IP pinning.
+        urllib.request.ProxyHandler({}),
+        _GuardedRedirectHandler(), _PinnedHTTPHandler(), _PinnedHTTPSHandler(context=ctx),
+    )
+    with opener.open(req, timeout=timeout) as resp:  # nosec B310 - scheme + public-IP allowlist enforced by caller + handler; connections pinned to validated addresses
         headers = dict(resp.headers.items())
         cookies = resp.headers.get_all("Set-Cookie") or []
         return resp.geturl(), headers, cookies

@@ -19,9 +19,34 @@ from cryptography import x509
 from cryptography.x509.oid import ExtensionOID, NameOID
 
 from app.modules.remediation import fix_for
-from app.modules.web_audit import UnsafeUrlError, assert_public_host, grade_for
+from app.modules.web_audit import (
+    UnsafeUrlError,
+    assert_public_host,
+    grade_for,
+    resolve_public_addresses,
+)
 
 _TIMEOUT = 6.0
+
+
+def _connect_pinned(host: str, port: int) -> socket.socket:
+    """Dial a validated address for ``host``, never the name itself.
+
+    ``socket.create_connection((host, port))`` re-resolves at connect
+    time — the DNS-rebinding hole. The addresses used here come from
+    ``resolve_public_addresses``, which validates every answer; the TLS
+    ``server_hostname`` stays the original name, so hostname verification
+    still applies to the real host.
+    """
+    last_exc: OSError | None = None
+    for ip in resolve_public_addresses(host):
+        try:
+            return socket.create_connection((ip, port), timeout=_TIMEOUT)
+        except OSError as exc:
+            last_exc = exc
+    if last_exc is not None:
+        raise last_exc
+    raise UnsafeUrlError(f"Host '{host}' does not resolve.")  # unreachable: resolver never returns []
 
 
 def _rdn_name(rdn_sequence) -> str:
@@ -179,7 +204,7 @@ def fetch_certificate(host: str, port: int = 443) -> tuple[dict, str | None, boo
     Returns (cert_dict, protocol, verified)."""
     verified_ctx = ssl.create_default_context()
     try:
-        with socket.create_connection((host, port), timeout=_TIMEOUT) as sock:
+        with _connect_pinned(host, port) as sock:
             with verified_ctx.wrap_socket(sock, server_hostname=host) as tls:
                 cert, protocol, der = tls.getpeercert(), tls.version(), tls.getpeercert(binary_form=True)
                 if der:
@@ -195,7 +220,7 @@ def fetch_certificate(host: str, port: int = 443) -> tuple[dict, str | None, boo
     unverified_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     unverified_ctx.check_hostname = False
     unverified_ctx.verify_mode = ssl.CERT_NONE
-    with socket.create_connection((host, port), timeout=_TIMEOUT) as sock:
+    with _connect_pinned(host, port) as sock:
         with unverified_ctx.wrap_socket(sock, server_hostname=host) as tls:
             der = tls.getpeercert(binary_form=True)
             return (_cert_dict_from_der(der) if der else {}), tls.version(), False

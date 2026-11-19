@@ -13,7 +13,11 @@ import urllib.request
 from urllib.parse import urljoin, urlparse
 
 from app.modules.url_analyzer import analyze_url
-from app.modules.web_audit import assert_public_host
+from app.modules.web_audit import (
+    _PinnedHTTPHandler,
+    _PinnedHTTPSHandler,
+    assert_public_host,
+)
 
 MAX_HOPS = 6
 TIMEOUT_SECONDS = 6.0
@@ -28,7 +32,13 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+# Pinned handlers: each hop dials a validated address, never the name
+# (DNS-rebinding defence, shared with web_audit — see _dial_pinned there).
+# Environment proxies are disabled for the same reason: a proxy would
+# resolve the name itself and defeat the pinning.
+_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), _NoRedirect, _PinnedHTTPHandler(), _PinnedHTTPSHandler()
+)
 
 
 def _fetch_status(url: str, method: str) -> tuple[int, str | None]:
