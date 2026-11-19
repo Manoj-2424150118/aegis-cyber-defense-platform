@@ -67,7 +67,19 @@ def _issue(user: User, response: Response) -> TokenResponse:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(body: RegisterRequest, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    from app.rate_limit import client_ip, register_limiter
+
+    # F-07: hourly per-IP creation budget, checked before any other work
+    # (including the password assessment and the duplicate-email query,
+    # so the endpoint's cost and its enumeration surface stay minimal
+    # once the budget is spent). client_ip() is the F-02-hardened
+    # resolver, so the budget cannot be dodged by rotating XFF entries.
+    if not register_limiter.allow(f"register:{client_ip(request)}"):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many accounts created from this connection. Try again in an hour.",
+        )
     from app.modules.password_lab import assess_password
 
     assessment = assess_password(body.password)

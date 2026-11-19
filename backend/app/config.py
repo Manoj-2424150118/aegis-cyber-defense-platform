@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # are far more expensive (and abusable as an anonymous proxy) than a
     # local analysis, so they get a much tighter per-IP budget.
     fetch_rate_limit_per_minute: int = 12
+    # Account creation is not a per-minute activity: a person needs one
+    # account, so registrations get an hourly budget (F-07). Bulk signups
+    # farm accounts for quota multiplication and spam.
+    register_rate_limit_per_hour: int = 3
     trending_cache_seconds: int = 60  # public trends are aggregates; serve them stale-tolerant
     trust_proxy: bool = False  # set True only behind a proxy that sets X-Forwarded-For
     trusted_proxy_hops: int = 1  # trusted hops appended to X-Forwarded-For from the right

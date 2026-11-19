@@ -56,6 +56,12 @@ _FETCH_PREFIXES = (
 # stuffing against one person.
 account_limiter = SlidingWindowLimiter(settings.auth_rate_limit_per_minute)
 
+# Registration budget (F-07): at most a few account creations per hour
+# per client IP, enforced inside the register route (same pattern as the
+# per-account login limiter). The generic per-minute auth limit (10/min)
+# still allows ~600 signups/hour/IP; this is the binding constraint.
+register_limiter = SlidingWindowLimiter(settings.register_rate_limit_per_hour, window_seconds=3600)
+
 
 def client_ip(request: Request) -> str:
     """Real client IP, resolved from the trusted end of the proxy chain.
