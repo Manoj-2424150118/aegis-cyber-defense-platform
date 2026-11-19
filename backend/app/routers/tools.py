@@ -292,6 +292,18 @@ def _checked_domain(raw: str) -> str:
 @router.post("/domain")
 async def check_domain(body: DomainRequest):
     domain = _checked_domain(body.domain)
+    # F-06: the checker resolves the name with the server's resolver, so
+    # without a gate it is a DNS oracle for internal names (an internal
+    # host returns records; a nonexistent one does not). Refuse anything
+    # that resolves to a non-public address, with one uniform message —
+    # the response must not reveal whether the name exists internally.
+    # A name that simply does not resolve falls through: the checker
+    # reports that honestly, which leaks nothing about internal space.
+    try:
+        await run_in_threadpool(web_audit.assert_public_host, domain)
+    except web_audit.UnsafeUrlError as exc:
+        if "non-public address" in str(exc):
+            raise HTTPException(400, "Domain resolution refused.") from None
     # DNS lookups block; keep them off the event loop.
     started = _time.perf_counter()
     result = await run_in_threadpool(domain_checker.check_domain, domain)
