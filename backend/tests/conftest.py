@@ -10,7 +10,13 @@ from fastapi.testclient import TestClient
 
 from app.db import Base, engine
 from app.main import app
-from app.rate_limit import account_limiter, auth_limiter, fetch_limiter, general_limiter
+from app.rate_limit import (
+    account_limiter,
+    auth_limiter,
+    fetch_account_limiter,
+    fetch_limiter,
+    general_limiter,
+)
 from app.routers import tools as tools_router
 
 
@@ -22,6 +28,7 @@ def _fresh_state():
     auth_limiter.reset()
     account_limiter.reset()
     fetch_limiter.reset()
+    fetch_account_limiter.reset()
     tools_router._recent_events.clear()
     tools_router._trending_cache = None
     yield
