@@ -9,4 +9,7 @@ RUN useradd --create-home aegis && chown -R aegis:aegis /app
 USER aegis
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# ONE worker on purpose: rate limiters/lockouts are per-process (F-09,
+# see README "Deployment constraint"). Do not raise this until the
+# limiter store is shared (Redis).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

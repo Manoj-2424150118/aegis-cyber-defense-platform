@@ -30,6 +30,10 @@ docker compose up --build      # app on http://localhost:8080 · API docs on :80
 
 Or skip the install — the [live demo](https://aegis-cyber-defense-platform.onrender.com) runs the full platform. Every option is detailed under [Setup & run](#setup--run).
 
+### Deployment constraint — exactly one worker
+
+All rate limiters, the registration budget, account lockouts and the trending anti-poisoning caps are **per-process** (in-memory sliding windows, by design for a dependency-free demo). Running the API with more than one worker or replica silently multiplies every budget by the worker count and splits lockouts across processes. **Run exactly one worker** (the shipped Dockerfiles and `render.yaml` do) until the limiter store is swapped for a shared backend — the limiter interface is a single `allow(key)` method, so a Redis store is a one-file change. Startup logs a loud warning if `WEB_CONCURRENCY` says otherwise.
+
 ## Overview
 
 Most people are not compromised by nation-state zero-days. They are compromised by a phishing link in an SMS, a fake "verify your account" email, a malware attachment disguised as an invoice, a weak or reused password, secrets stored in plaintext notes, or card details typed into an unsafe website.
