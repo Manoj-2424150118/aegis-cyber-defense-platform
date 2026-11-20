@@ -217,8 +217,8 @@ def raw_post(path: str, body: dict) -> str:
 def stream_checks() -> None:
     text = raw_post("/api/tools/url/stream", {"url": "http://192.168.10.5/paypal/login/verify"})
     steps = text.count('"type": "step"')
-    record("stream", "url stream emits 5 steps + result(85)",
-           steps == 5 and '"type": "result"' in text and '"risk_score": 85' in text, f"steps={steps}")
+    record("stream", "url stream emits 6 steps + result(85)",
+           steps == 6 and '"type": "result"' in text and '"risk_score": 85' in text, f"steps={steps}")
     text = raw_post("/api/tools/web-audit/stream", {"url": "http://169.254.169.254/latest/meta-data/"})
     record("stream", "web-audit stream refuses SSRF with error event", '"type": "error"' in text)
     text = raw_post("/api/tools/password/stream", {"password": "password123"})
