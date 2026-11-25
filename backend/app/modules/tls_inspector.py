@@ -203,6 +203,11 @@ def fetch_certificate(host: str, port: int = 443) -> tuple[dict, str | None, boo
     re-handshake unverified to inspect what was presented.
     Returns (cert_dict, protocol, verified)."""
     verified_ctx = ssl.create_default_context()
+    # A TLS inspector must never negotiate TLS 1.0/1.1, even though
+    # create_default_context() already defaults to >=1.2: pin it explicitly
+    # so the floor survives interpreter/default changes (CodeQL
+    # py/insecure-protocol).
+    verified_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     try:
         with _connect_pinned(host, port) as sock:
             with verified_ctx.wrap_socket(sock, server_hostname=host) as tls:
@@ -220,6 +225,10 @@ def fetch_certificate(host: str, port: int = 443) -> tuple[dict, str | None, boo
     unverified_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     unverified_ctx.check_hostname = False
     unverified_ctx.verify_mode = ssl.CERT_NONE
+    # Unverified here means "don't validate the cert" (so we can inspect
+    # what was presented), not "accept obsolete protocols": same TLS 1.2
+    # floor as the verified handshake (CodeQL py/insecure-protocol).
+    unverified_ctx.minimum_version = ssl.TLSVersion.TLSv1_2
     with _connect_pinned(host, port) as sock:
         with unverified_ctx.wrap_socket(sock, server_hostname=host) as tls:
             der = tls.getpeercert(binary_form=True)

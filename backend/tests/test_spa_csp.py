@@ -31,7 +31,9 @@ def test_csp_has_no_unsafe_inline_or_eval():
 
 
 def test_no_executable_inline_scripts():
-    tags = re.findall(r"<script\b[^>]*>", INDEX)
+    # Case-insensitive: an uppercase <SCRIPT> tag is executable too, and a
+    # case-sensitive scan would miss it (CodeQL py/bad-tag-filter).
+    tags = re.findall(r"<script\b[^>]*>", INDEX, re.IGNORECASE)
     assert tags, "index.html should load its scripts"
     for tag in tags:
         if 'type="application/ld+json"' in tag:

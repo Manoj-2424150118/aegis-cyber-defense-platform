@@ -55,9 +55,10 @@ def test_benign_message_is_safe():
 
 def test_extract_links_shapes():
     links = extract_links("go to https://a.example.com/x or www.b-site.org or plain c.xyz/page now")
-    assert any("a.example.com" in link for link in links)
-    assert any("b-site.org" in link for link in links)
-    assert any("c.xyz" in link for link in links)
+    # Exact membership, not substring matching: "b-site.org" must be the
+    # extracted link itself, not hidden inside a longer host
+    # (CodeQL py/incomplete-url-substring-sanitization).
+    assert links == ["https://a.example.com/x", "www.b-site.org", "c.xyz/page"]
 
 
 def test_message_endpoint_and_stream_parity(client):
