@@ -162,9 +162,7 @@ def breach_check_local(password: str) -> dict:
 async def breach_check(password: str) -> dict:
     """k-anonymity breach lookup; degrades gracefully to the offline list."""
     # SHA-1 is mandated by the HIBP k-anonymity protocol itself, not used for storage.
-    # codeql[py/weak-sensitive-data-hashing]: only the 5-char prefix is sent to
-    # HIBP; the full hash never leaves the process and is never stored.
-    sha1 = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()
+    sha1 = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()  # codeql[py/weak-sensitive-data-hashing]: only the 5-char prefix is sent to HIBP; the full hash never leaves the process and is never stored
     prefix, suffix = sha1[:5], sha1[5:]
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
