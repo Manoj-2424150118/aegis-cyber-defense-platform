@@ -113,7 +113,7 @@ Explicitly out of scope: endpoint compromise of the user's own device, and detec
 
 | Layer | Technology |
 |---|---|
-| Backend | Python 3.12 · FastAPI 0.162 · Pydantic 2 · SQLAlchemy 2.0 |
+| Backend | Python 3.12 · FastAPI 0.165.0 · Pydantic 2 · SQLAlchemy 2.0 |
 | Frontend | React 19 · TypeScript · Vite 8 (served by nginx, or by FastAPI in single-service mode) |
 | Authentication | Argon2id password hashing (`argon2-cffi`) · JWT (`PyJWT`) with lockout + rate limiting |
 | Cryptography | AES-256-GCM vault encryption (`cryptography`) · Argon2id KDF · `secrets`-based password generation |
